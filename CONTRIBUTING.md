@@ -48,13 +48,15 @@ docker buildx bake --load nodejs     # or omit the target to build every variant
 
 ## Releases
 
-Maintainers create a release by pushing a semver tag:
+Members of the `release-managers` team create a release by pushing a semver tag:
 
 ```sh
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-CI then builds and publishes every container image variant.
+A tag ruleset rejects `v*` tags pushed by anyone outside that team. The release workflow runs in the protected
+`release` environment, so it waits for a `release-managers` approval before it builds and publishes every container
+image variant.
 
 ## License
 

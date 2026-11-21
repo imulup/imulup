@@ -8,6 +8,8 @@ permissions: {}
 jobs:
   images:
     runs-on: ubuntu-latest
+    # Protected environment: publishing waits for approval from release-managers and only runs for v* tags.
+    environment: release
     permissions:
       contents: read
       packages: write
