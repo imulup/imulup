@@ -1,0 +1,25 @@
+# Example imulup.yaml — place at the repo root.
+version: 1
+projects:
+  - name: network-prod
+    dir: network
+    stack: prod
+    apply_requirements: [approved, mergeable]
+    autoplan:
+      when_modified: ["**/*.ts", "Pulumi*.yaml", "package*.json"]
+    workflow: node
+  - name: network-dev
+    dir: network
+    stack: dev
+    workflow: node
+
+workflows:
+  node:
+    plan:
+      steps:
+        - run: npm ci
+        - preview
+    apply:
+      steps:
+        - run: npm ci
+        - up

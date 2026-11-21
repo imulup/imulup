@@ -1,0 +1,50 @@
+[package]
+name = "imulup"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Atlantis-style pull request automation for Pulumi"
+license = "Apache-2.0"
+authors = ["The imulup authors"]
+readme = "README.md"
+keywords = ["pulumi", "atlantis", "gitops", "infrastructure", "github"]
+categories = ["command-line-utilities", "development-tools"]
+publish = false # distributed as container images
+
+[dependencies]
+anyhow = "1.0.104"
+async-trait = "0.1.92"
+axum = "0.8.9"
+base64 = "0.23.1"
+clap = { version = "4.6.9", features = ["derive", "env"] }
+globset = "0.4.21"
+hex = "0.4.3"
+hmac = "0.13.0"
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde-saphyr = "1.1.0"
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+shell-words = "1.1.1"
+tokio = { version = "1.54.1", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+# Run with: cargo clippy --all-targets -- -D warnings
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
+# Noise for an application crate.
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+struct_excessive_bools = "allow" # CLI flag structs
