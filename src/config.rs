@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use clap::{ArgAction, Parser, builder::BoolishValueParser};
+use anyhow::Context;
+use clap::{ArgAction, ArgGroup, Parser, builder::BoolishValueParser};
 use globset::{GlobBuilder, GlobMatcher};
 
 /// Server configuration. Every flag can also be set via its `IMULUP_*` environment variable;
@@ -9,7 +10,10 @@ use globset::{GlobBuilder, GlobMatcher};
 #[command(
     name = "imulup",
     version,
-    about = "Pulumi pull request automation (Atlantis-style)"
+    about = "Pulumi pull request automation (Atlantis-style)",
+    // Authenticate with exactly one of a token or a GitHub App.
+    group(ArgGroup::new("gh_auth").required(true).args(["gh_token", "gh_app_id"])),
+    group(ArgGroup::new("gh_app_key_source").args(["gh_app_key", "gh_app_key_file"])),
 )]
 pub struct ServerConfig {
     /// Address to bind the HTTP server to.
@@ -20,17 +24,36 @@ pub struct ServerConfig {
     #[arg(long, env = "IMULUP_PORT", default_value_t = 4141)]
     pub port: u16,
 
-    /// GitHub token (PAT or installation token) used for API calls and git fetches.
-    #[arg(long, env = "IMULUP_GH_TOKEN", hide_env_values = true)]
-    pub gh_token: String,
+    /// GitHub token (PAT) used for API calls and git fetches. Use this or `--gh-app-id`.
+    #[arg(
+        long,
+        env = "IMULUP_GH_TOKEN",
+        hide_env_values = true,
+        requires = "gh_user"
+    )]
+    pub gh_token: Option<String>,
+
+    /// GitHub App ID. imulup authenticates as the app and uses a short-lived installation token
+    /// for each repo. Needs `--gh-app-key` or `--gh-app-key-file`.
+    #[arg(long, env = "IMULUP_GH_APP_ID", requires = "gh_app_key_source")]
+    pub gh_app_id: Option<u64>,
+
+    /// GitHub App private key (PEM contents).
+    #[arg(long, env = "IMULUP_GH_APP_KEY", hide_env_values = true)]
+    pub gh_app_key: Option<String>,
+
+    /// Path to the GitHub App private key (PEM file). It is read once at startup.
+    #[arg(long, env = "IMULUP_GH_APP_KEY_FILE")]
+    pub gh_app_key_file: Option<PathBuf>,
 
     /// Secret configured on the GitHub webhook; used to verify X-Hub-Signature-256.
     #[arg(long, env = "IMULUP_GH_WEBHOOK_SECRET", hide_env_values = true)]
     pub gh_webhook_secret: String,
 
-    /// Login of the GitHub user imulup acts as. Comments from this user are ignored.
+    /// Login imulup acts as; comments from it are ignored. Required with `--gh-token`. With a
+    /// GitHub App it defaults to `<app-slug>[bot]`.
     #[arg(long, env = "IMULUP_GH_USER")]
-    pub gh_user: String,
+    pub gh_user: Option<String>,
 
     /// GitHub API base URL (set for GitHub Enterprise, e.g. <https://ghe.example.com/api/v3>).
     #[arg(
@@ -91,6 +114,25 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
+    /// The GitHub credentials selected by the flags, with the app key file read in.
+    pub fn gh_credentials(&self) -> anyhow::Result<crate::vcs::Credentials> {
+        use crate::vcs::Credentials;
+        if let Some(token) = &self.gh_token {
+            return Ok(Credentials::Token(token.clone()));
+        }
+        let app_id = self.gh_app_id.context("set --gh-token or --gh-app-id")?;
+        let private_key_pem = match (&self.gh_app_key, &self.gh_app_key_file) {
+            (Some(k), _) => k.clone(),
+            (None, Some(path)) => std::fs::read_to_string(path)
+                .with_context(|| format!("reading GitHub App key {}", path.display()))?,
+            (None, None) => anyhow::bail!("--gh-app-id needs --gh-app-key or --gh-app-key-file"),
+        };
+        Ok(Credentials::App {
+            app_id,
+            private_key_pem,
+        })
+    }
+
     pub fn repo_allowlist_matcher(&self) -> anyhow::Result<RepoAllowlist> {
         RepoAllowlist::new(&self.repo_allowlist)
     }
@@ -120,6 +162,33 @@ impl RepoAllowlist {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse(args: &[&str]) -> Result<ServerConfig, clap::Error> {
+        let base = ["imulup", "--gh-webhook-secret=s", "--repo-allowlist=a/*"];
+        ServerConfig::try_parse_from(base.iter().chain(args))
+    }
+
+    #[test]
+    fn auth_flags() {
+        assert!(parse(&["--gh-token=t", "--gh-user=u"]).is_ok());
+        assert!(parse(&["--gh-app-id=1", "--gh-app-key=k"]).is_ok());
+        assert!(parse(&["--gh-app-id=1", "--gh-app-key-file=/k.pem"]).is_ok());
+        // Need one auth method, and only one.
+        assert!(parse(&[]).is_err());
+        assert!(
+            parse(&[
+                "--gh-token=t",
+                "--gh-user=u",
+                "--gh-app-id=1",
+                "--gh-app-key=k"
+            ])
+            .is_err()
+        );
+        // A token needs a user; an app needs exactly one key source.
+        assert!(parse(&["--gh-token=t"]).is_err());
+        assert!(parse(&["--gh-app-id=1"]).is_err());
+        assert!(parse(&["--gh-app-id=1", "--gh-app-key=k", "--gh-app-key-file=/k"]).is_err());
+    }
 
     #[test]
     fn allowlist_globs() {

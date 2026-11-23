@@ -80,12 +80,40 @@ by a `run` step or already present. Checkouts are reused between runs, so depend
 
 ## Running
 
+imulup authenticates to GitHub as either a **GitHub App** (recommended) or a user with a **token**.
+
+### As a GitHub App
+
+Create a GitHub App (*Settings → Developer settings → GitHub Apps*) with:
+
+* **Webhook URL:** `https://<host>/events`, **secret:** the same value as `IMULUP_GH_WEBHOOK_SECRET`
+* **Repository permissions:** Contents *read*, Pull requests *read & write*, Issues *read & write*,
+  Commit statuses *read & write*, Metadata *read*
+* **Subscribe to events:** *Pull request* and *Issue comment*
+
+Generate a private key, install the app on your repos, and run:
+
+```sh
+export IMULUP_GH_APP_ID=123456
+export IMULUP_GH_APP_KEY_FILE=/path/to/app.private-key.pem   # or IMULUP_GH_APP_KEY with the PEM contents
+export IMULUP_GH_WEBHOOK_SECRET=...
+export IMULUP_REPO_ALLOWLIST='my-org/*'
+export PULUMI_ACCESS_TOKEN=...              # plus cloud credentials your programs need
+cargo run --release
+```
+
+imulup checks the key at startup and comments as `<app-slug>[bot]`. For each repo, it looks up the app's
+installation and uses a short-lived installation token, refreshed every 45 minutes, for API calls and git fetches.
+The app's own webhook delivers events, so you don't need a repository webhook.
+
+### With a token
+
 ```sh
 export IMULUP_GH_TOKEN=ghp_...              # repo scope: contents, pull requests, statuses
 export IMULUP_GH_WEBHOOK_SECRET=...         # same secret as on the webhook
 export IMULUP_GH_USER=my-imulup-bot         # login that owns the token
 export IMULUP_REPO_ALLOWLIST='my-org/*'
-export PULUMI_ACCESS_TOKEN=...              # plus cloud credentials your programs need
+export PULUMI_ACCESS_TOKEN=...
 cargo run --release
 ```
 
@@ -137,14 +165,19 @@ against an allowlisted repo can run code on the imulup host with whatever cloud 
 * PRs from forks are ignored by default (`--allow-fork-prs` turns them back on).
 * Commands require write access to the repo.
 * Webhooks without a valid `X-Hub-Signature-256` signature are rejected.
-* All `IMULUP_*` variables (including the GitHub token and the webhook secret) are removed from the environment before steps run. The token is also redacted from any output posted to the PR.
+* All `IMULUP_*` variables (including the GitHub token, the app key, and the webhook secret) are removed from the environment before steps run. GitHub tokens are also redacted from any output posted to the PR.
 * git credentials are passed through environment-based config, so they never appear in `.git/config` or the process args.
+
+Steps run as the same OS user as imulup, so a determined PR author can still read imulup's credentials from the
+process environment or from `--gh-app-key-file`. A GitHub App limits the damage: installation tokens expire within
+an hour and only cover the repos the app is installed on. A leaked app *key*, however, can mint tokens for every
+installation. Install the app only where imulup needs it.
 
 Give the credentials only the scope they need, and limit `--repo-allowlist` to repos whose contributors you trust.
 
 ## Limitations / roadmap
 
-* GitHub only, authenticated with a token. GitHub App auth and GitLab aren't supported yet; `vcs::Vcs` is the extension point.
+* GitHub only. GitLab and other hosts aren't supported yet; `vcs::Vcs` is the extension point.
 * `apply` re-runs `pulumi up` against the same commit. It doesn't use Pulumi's experimental `--save-plan` / `--plan`.
 * State is a single JSON file (`<data-dir>/state.json`), so you can only run one imulup instance.
 * `mergeable` checks only for merge conflicts. It doesn't evaluate branch protection rules.

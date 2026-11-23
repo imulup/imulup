@@ -20,14 +20,18 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let cfg = ServerConfig::parse();
+    let mut cfg = ServerConfig::parse();
     let allowlist = cfg
         .repo_allowlist_matcher()
         .context("invalid --repo-allowlist")?;
     std::fs::create_dir_all(&cfg.data_dir)?;
     let store = Store::open(&cfg.data_dir.join("state.json"))?;
     let workspaces = Workspaces::new(cfg.data_dir.join("repos"));
-    let vcs = Arc::new(GitHub::new(&cfg.gh_api_url, &cfg.gh_token)?);
+    let vcs = Arc::new(GitHub::new(&cfg.gh_api_url, cfg.gh_credentials()?)?);
+    if let Some(login) = vcs.app_login().await? {
+        info!("authenticated as GitHub App {login}");
+        cfg.gh_user.get_or_insert(login);
+    }
 
     let addr = format!("{}:{}", cfg.bind, cfg.port);
     let webhook_secret = cfg.gh_webhook_secret.clone();

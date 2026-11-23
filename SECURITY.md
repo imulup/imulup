@@ -32,6 +32,7 @@ Issues in scope include, for example:
 
 - bypassing webhook signature verification, the repo allowlist, the fork-PR restriction, or the write-access check
 - applying changes without a current, successful plan, or without meeting the apply requirements
-- leaking the GitHub token or the webhook secret (into PR comments, logs, or user code)
+- leaking the GitHub token, an installation token, the GitHub App key, or the webhook secret (into PR comments,
+  logs, or the environment of user code)
 - escaping the per-PR workspace with paths from `imulup.yaml` or PR content
 - denial of service against the server from unauthenticated webhook requests
