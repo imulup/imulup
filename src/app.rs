@@ -86,6 +86,7 @@ impl App {
             | Event::PullClosed { repo, number }
             | Event::Comment { repo, number, .. } => (repo.clone(), *number),
         };
+        self.vcs.job_started(&repo);
         let mutex = self.pr_mutex(&repo, number);
         let guard = mutex.lock().await;
         let result = match event {
@@ -106,6 +107,7 @@ impl App {
             }
         }
         drop(guard);
+        self.vcs.job_finished(&repo).await;
         // Drop the per-PR mutex once nobody else holds or waits on it. Waiters clone the Arc
         // under the same std lock, so the count can't change underneath us.
         let mut m = self

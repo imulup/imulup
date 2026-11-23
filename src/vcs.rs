@@ -65,6 +65,11 @@ pub trait Vcs: Send + Sync {
     async fn git_auth_header(&self, repo: &str) -> Result<Option<String>>;
     /// Strings that must never appear in comments or logs.
     fn secrets(&self) -> Vec<String>;
+    /// Marks the start of work on `repo`. Every call must be paired with [`Vcs::job_finished`].
+    fn job_started(&self, _repo: &str) {}
+    /// Marks the end of work on `repo`. Implementations may revoke short-lived credentials for
+    /// `repo` once no job is using them.
+    async fn job_finished(&self, _repo: &str) {}
 }
 
 pub struct GitHub {
@@ -78,7 +83,7 @@ pub enum Credentials {
     /// A personal access token (or any other long-lived token).
     Token(String),
     /// A GitHub App: imulup signs a JWT with the app's private key and exchanges it for
-    /// short-lived installation tokens, one per installation.
+    /// short-lived installation tokens, scoped to one repo and the permissions imulup needs.
     App {
         app_id: u64,
         private_key_pem: String,
@@ -87,7 +92,7 @@ pub enum Credentials {
 
 enum Auth {
     Token(String),
-    App(AppAuth),
+    App(Box<AppAuth>),
 }
 
 struct AppAuth {
@@ -95,8 +100,36 @@ struct AppAuth {
     key: jsonwebtoken::EncodingKey,
     /// Lowercased `owner/repo` -> installation id.
     installations: Mutex<HashMap<String, u64>>,
-    /// Installation id -> token.
-    tokens: Mutex<HashMap<u64, InstallationToken>>,
+    /// Lowercased `owner/repo` and scope -> token.
+    tokens: Mutex<HashMap<(String, Scope), InstallationToken>>,
+    /// Lowercased `owner/repo` -> number of jobs in progress.
+    jobs: Mutex<HashMap<String, usize>>,
+    /// Serializes minting, so concurrent callers share one token instead of racing to replace
+    /// each other's (and losing track of one that then can't be revoked or redacted).
+    minting: tokio::sync::Mutex<()>,
+}
+
+/// What an installation token is for. Each scope gets its own token with only the permissions it
+/// needs, so the token handed to git can't comment, approve, or set statuses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum Scope {
+    Api,
+    Git,
+}
+
+impl Scope {
+    /// Installation token permissions. `metadata: read` is always included by GitHub.
+    fn permissions(self) -> Value {
+        match self {
+            // Pull requests, files, and reviews; comments and reactions; commit statuses.
+            Scope::Api => json!({
+                "pull_requests": "write",
+                "issues": "write",
+                "statuses": "write",
+            }),
+            Scope::Git => json!({"contents": "read"}),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -173,13 +206,15 @@ impl GitHub {
             Credentials::App {
                 app_id,
                 private_key_pem,
-            } => Auth::App(AppAuth {
+            } => Auth::App(Box::new(AppAuth {
                 app_id,
                 key: jsonwebtoken::EncodingKey::from_rsa_pem(private_key_pem.as_bytes())
                     .context("GitHub App private key is not a valid RSA PEM key")?,
                 installations: Mutex::default(),
                 tokens: Mutex::default(),
-            }),
+                jobs: Mutex::default(),
+                minting: tokio::sync::Mutex::default(),
+            })),
         };
         Ok(Self {
             http,
@@ -202,13 +237,26 @@ impl GitHub {
         Ok(Some(format!("{}[bot]", a.slug)))
     }
 
-    /// The token to use for API calls and git fetches against `repo`.
-    async fn token(&self, repo: &str) -> Result<String> {
+    /// The token to use for `scope` against `repo`.
+    async fn token(&self, repo: &str, scope: Scope) -> Result<String> {
         let app = match &self.auth {
             Auth::Token(t) => return Ok(t.clone()),
             Auth::App(app) => app,
         };
         let key = repo.to_ascii_lowercase();
+        let cache_key = (key.clone(), scope);
+        let fresh = |t: &InstallationToken| t.fetched.elapsed() < TOKEN_REFRESH_AFTER;
+        if let Some(t) = lock(&app.tokens).get(&cache_key).filter(|t| fresh(t)) {
+            return Ok(t.token.clone());
+        }
+        let _minting = app.minting.lock().await;
+        // Someone may have minted while we waited.
+        let previous = match lock(&app.tokens).get(&cache_key) {
+            Some(t) if fresh(t) => return Ok(t.token.clone()),
+            Some(t) => Some(t.token.clone()),
+            None => None,
+        };
+
         let cached = lock(&app.installations).get(&key).copied();
         let installation = if let Some(id) = cached {
             id
@@ -233,22 +281,24 @@ impl GitHub {
             i.id
         };
 
-        let previous = match lock(&app.tokens).get(&installation) {
-            Some(t) if t.fetched.elapsed() < TOKEN_REFRESH_AFTER => return Ok(t.token.clone()),
-            Some(t) => Some(t.token.clone()),
-            None => None,
-        };
+        let name = repo.split_once('/').map_or(repo, |(_, name)| name);
+        let body = json!({"repositories": [name], "permissions": scope.permissions()});
         let jwt = app.jwt()?;
         let path = format!("/app/installations/{installation}/access_tokens");
-        let (status, value) = self.request_with(&jwt, Method::POST, &path, None).await?;
+        let (status, value) = self
+            .request_with(&jwt, Method::POST, &path, Some(body))
+            .await?;
         if !status.is_success() {
             // The app may have been reinstalled under a new id; look it up again next time.
             lock(&app.installations).remove(&key);
-            bail!("creating an installation token for {repo} returned {status}");
+            bail!(
+                "creating an installation token for {repo} returned {status} \
+                 (does the GitHub App have the permissions listed in the README?)"
+            );
         }
         let t: GhAccessToken = serde_json::from_value(value)?;
         lock(&app.tokens).insert(
-            installation,
+            cache_key,
             InstallationToken {
                 token: t.token.clone(),
                 fetched: Instant::now(),
@@ -265,7 +315,7 @@ impl GitHub {
         path: &str,
         body: Option<Value>,
     ) -> Result<(StatusCode, Value)> {
-        let token = self.token(repo).await?;
+        let token = self.token(repo, Scope::Api).await?;
         self.request_with(&token, method, path, body).await
     }
 
@@ -307,7 +357,7 @@ impl GitHub {
         path: &str,
         body: Option<Value>,
     ) -> Result<T> {
-        let token = self.token(repo).await?;
+        let token = self.token(repo, Scope::Api).await?;
         self.ok_with(&token, method, path, body).await
     }
 
@@ -519,7 +569,7 @@ impl Vcs for GitHub {
     }
 
     async fn git_auth_header(&self, repo: &str) -> Result<Option<String>> {
-        let token = self.token(repo).await?;
+        let token = self.token(repo, Scope::Git).await?;
         Ok(Some(format!("Basic {}", basic_auth(&token))))
     }
 
@@ -538,5 +588,46 @@ impl Vcs for GitHub {
                 [t, basic]
             })
             .collect()
+    }
+
+    fn job_started(&self, repo: &str) {
+        if let Auth::App(app) = &self.auth {
+            *lock(&app.jobs)
+                .entry(repo.to_ascii_lowercase())
+                .or_default() += 1;
+        }
+    }
+
+    async fn job_finished(&self, repo: &str) {
+        let Auth::App(app) = &self.auth else { return };
+        let key = repo.to_ascii_lowercase();
+        let revoke: Vec<String> = {
+            // Hold `jobs` while evicting, so a job that starts now mints fresh tokens instead
+            // of picking up ones that are about to be revoked.
+            let mut jobs = lock(&app.jobs);
+            let n = jobs.entry(key.clone()).or_default();
+            *n = n.saturating_sub(1);
+            if *n > 0 {
+                return;
+            }
+            jobs.remove(&key);
+            let mut tokens = lock(&app.tokens);
+            [Scope::Api, Scope::Git]
+                .into_iter()
+                .filter_map(|scope| tokens.remove(&(key.clone(), scope)))
+                .flat_map(|t| std::iter::once(t.token).chain(t.previous))
+                .collect()
+        };
+        for token in revoke {
+            match self
+                .request_with(&token, Method::DELETE, "/installation/token", None)
+                .await
+            {
+                // 401: already expired or revoked.
+                Ok((s, _)) if s.is_success() || s == StatusCode::UNAUTHORIZED => {}
+                Ok((s, _)) => tracing::warn!(%repo, "revoking installation token returned {s}"),
+                Err(e) => tracing::warn!(%repo, "revoking installation token: {e:#}"),
+            }
+        }
     }
 }

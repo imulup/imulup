@@ -102,9 +102,13 @@ export PULUMI_ACCESS_TOKEN=...              # plus cloud credentials your progra
 cargo run --release
 ```
 
-imulup checks the key at startup and comments as `<app-slug>[bot]`. For each repo, it looks up the app's
-installation and uses a short-lived installation token, refreshed every 45 minutes, for API calls and git fetches.
-The app's own webhook delivers events, so you don't need a repository webhook.
+imulup checks the key at startup and comments as `<app-slug>[bot]`. The key file must not be readable by group or
+others (`chmod 600`), or imulup refuses to start. The app's own webhook delivers events, so you don't need a
+repository webhook.
+
+For each repo, imulup mints short-lived installation tokens that cover only that repo. API calls get a token limited
+to pull requests, issues, and statuses. git fetches get a separate `contents: read` token. Tokens are refreshed every
+45 minutes and revoked once no job on the repo is running.
 
 ### With a token
 
@@ -167,11 +171,14 @@ against an allowlisted repo can run code on the imulup host with whatever cloud 
 * Webhooks without a valid `X-Hub-Signature-256` signature are rejected.
 * All `IMULUP_*` variables (including the GitHub token, the app key, and the webhook secret) are removed from the environment before steps run. GitHub tokens are also redacted from any output posted to the PR.
 * git credentials are passed through environment-based config, so they never appear in `.git/config` or the process args.
+* On Linux, imulup marks itself non-dumpable. Its `/proc/<pid>/environ` and memory are then unreadable by steps,
+  even when steps run as root in a container (without `CAP_SYS_PTRACE`).
+* GitHub App installation tokens cover one repo and only the permissions needed, and are revoked when work on
+  the repo finishes.
 
-Steps run as the same OS user as imulup, so a determined PR author can still read imulup's credentials from the
-process environment or from `--gh-app-key-file`. A GitHub App limits the damage: installation tokens expire within
-an hour and only cover the repos the app is installed on. A leaked app *key*, however, can mint tokens for every
-installation. Install the app only where imulup needs it.
+Steps still run as the same OS user as imulup, so a determined PR author can read `--gh-app-key-file` (and, in a
+container running as root, any file). A leaked app *key* can mint tokens for every installation, so install the app
+only where imulup needs it.
 
 Give the credentials only the scope they need, and limit `--repo-allowlist` to repos whose contributors you trust.
 
