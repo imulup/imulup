@@ -161,6 +161,12 @@ docker run -p 4141:4141 -e IMULUP_GH_TOKEN -e IMULUP_GH_WEBHOOK_SECRET -e IMULUP
   -e IMULUP_REPO_ALLOWLIST -e PULUMI_ACCESS_TOKEN -v imulup-data:/data imulup:nodejs
 ```
 
+The container starts as root, reads its secrets, and then runs as the `imulup` user. Checkouts and steps run as the
+unprivileged `imulup-runner` user, with home directory `/home/imulup-runner` (see [Security model](#security-model)). Steps
+therefore can't install packages system-wide: use a virtualenv or `pip install --user`, a project-local `node_modules`, and
+so on. To run everything as root as before (not recommended), set `IMULUP_SERVER_USER=` and `IMULUP_STEP_USER=` to empty
+values.
+
 ## Security model
 
 Unlike Terraform HCL, **a Pulumi program is arbitrary code**, and so is a `run:` step. Anyone who can open a PR
@@ -175,10 +181,44 @@ against an allowlisted repo can run code on the imulup host with whatever cloud 
   even when steps run as root in a container (without `CAP_SYS_PTRACE`).
 * GitHub App installation tokens cover one repo and only the permissions needed, and are revoked when work on
   the repo finishes.
+* `imulup.yaml` must be a regular file. A symlink (to `/proc/self/environ`, say) is refused, so a parse error can't quote
+  imulup's secrets into a PR comment.
 
-Steps still run as the same OS user as imulup, so a determined PR author can read `--gh-app-key-file` (and, in a
-container running as root, any file). A leaked app *key* can mint tokens for every installation, so install the app
-only where imulup needs it.
+#### Privilege separation
+
+With `--server-user` and `--step-user` (the Docker images set both), PR code runs as a different OS user from imulup.
+This works on Linux only.
+
+1. imulup starts as root, reads its secrets, and prepares the data directory:
+
+   | Path | Owner | Mode | Notes |
+   | --- | --- | --- | --- |
+   | `<data-dir>` | server | `0711` | the step user can't list it |
+   | `state.json` | server | `0600` | |
+   | `mirrors/` | server | `0755` | |
+   | `repos/` | step | `0755` | |
+
+2. imulup switches permanently to the server user. It keeps only `CAP_SETUID`, `CAP_SETGID` and `CAP_KILL`, to start and
+   stop steps as the step user, and sets `no_new_privs`.
+3. imulup fetches PR heads, with credentials, into its own bare mirror under `mirrors/`. The step user then checks out from
+   that mirror locally, so git credentials never reach a step-user process.
+4. Steps run as the step user with no capabilities. They can't read the key file, `state.json`, imulup's environment or
+   memory, or the mirrors' contents. They can't write to the mirrors or signal imulup.
+
+Outside Docker, create two users and start imulup as root:
+
+```sh
+useradd --system --no-create-home --shell /usr/sbin/nologin imulup
+useradd --create-home --shell /bin/sh imulup-runner
+IMULUP_SERVER_USER=imulup IMULUP_STEP_USER=imulup-runner imulup ...
+```
+
+Keep the app key file readable by root only (`chown root: key.pem && chmod 400 key.pem`).
+
+What privilege separation does *not* cover: steps for all repos and PRs share the step user. One PR's code can read or
+tamper with another PR's checkout, or with the step user's caches (`~/.pulumi` plugins, package caches). Steps also get
+every non-`IMULUP_*` variable in imulup's environment (such as `PULUMI_ACCESS_TOKEN` and cloud credentials), because they
+need them. A leaked app *key* can mint tokens for every installation, so install the app only where imulup needs it.
 
 Give the credentials only the scope they need, and limit `--repo-allowlist` to repos whose contributors you trust.
 

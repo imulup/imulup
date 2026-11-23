@@ -89,7 +89,11 @@ impl Store {
 
     fn persist(&self, data: &Data) -> Result<()> {
         let tmp = self.path.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec_pretty(data)?)?;
+        let mut opts = std::fs::OpenOptions::new();
+        opts.write(true).create(true).truncate(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+        std::io::Write::write_all(&mut opts.open(&tmp)?, &serde_json::to_vec_pretty(data)?)?;
         std::fs::rename(&tmp, &self.path)?;
         Ok(())
     }

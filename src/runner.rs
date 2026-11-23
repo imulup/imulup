@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use tokio::process::Command;
 
+use crate::privsep::Identity;
 use crate::repo_config::Step;
 
 /// Context exposed to steps; `run:` steps also see these as `IMULUP_*` env vars.
@@ -21,6 +22,8 @@ pub struct StepEnv {
     pub head_sha: String,
     pub user: String,
     pub timeout: Duration,
+    /// Run steps as this user instead of imulup's own.
+    pub run_as: Option<Identity>,
 }
 
 #[derive(Debug, Clone)]
@@ -110,6 +113,13 @@ async fn run(argv: &[String], cwd: &Path, env: &StepEnv) -> StepResult {
         .env("IMULUP_PULL", env.pull.to_string())
         .env("IMULUP_HEAD_SHA", &env.head_sha)
         .env("IMULUP_USER", &env.user);
+    if let Some(u) = &env.run_as {
+        cmd.uid(u.uid)
+            .gid(u.gid)
+            .env("HOME", &u.home)
+            .env("USER", &u.name)
+            .env("LOGNAME", &u.name);
+    }
 
     let child = match cmd.spawn() {
         Ok(c) => c,
@@ -211,6 +221,7 @@ mod tests {
             head_sha: "abc".into(),
             user: "u".into(),
             timeout: Duration::from_secs(10),
+            run_as: None,
         };
         // SAFETY: test-only. The name is unique to this test, so no other test thread reads it
         // (a real flag's variable, like IMULUP_GH_TOKEN, would race with config parsing tests).

@@ -23,6 +23,18 @@ jobs:
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --locked
 
+  # Privilege separation needs Linux and root, which a job container provides.
+  privsep:
+    runs-on: ubuntu-latest
+    container: rust:1-bookworm@sha256:ade39a710ef85f3506cffcfec3e8a24ba090badef1dff2fb798f71d878833fea
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: cargo test --locked --test privsep
+
   msrv:
     runs-on: ubuntu-latest
     permissions:

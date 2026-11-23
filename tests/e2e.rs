@@ -223,7 +223,7 @@ impl Harness {
             cfg,
             Arc::new(gh.clone()),
             Store::open(&data.join("state.json")).unwrap(),
-            Workspaces::new(data.join("repos")),
+            Workspaces::new(&data, None),
         );
         Harness {
             _tmp: tmp,
