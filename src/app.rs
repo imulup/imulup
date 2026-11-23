@@ -119,7 +119,7 @@ impl App {
     }
 
     async fn checkout(&self, pull: &PullRequest) -> Result<Checkout> {
-        let auth = self.vcs.git_auth_header();
+        let auth = self.vcs.git_auth_header(&pull.repo).await?;
         let root = self
             .workspaces
             .checkout(
@@ -212,7 +212,12 @@ impl App {
         body: &str,
         comment_id: u64,
     ) -> Result<()> {
-        if user.eq_ignore_ascii_case(&self.cfg.gh_user) {
+        if self
+            .cfg
+            .gh_user
+            .as_deref()
+            .is_some_and(|me| user.eq_ignore_ascii_case(me))
+        {
             return Ok(());
         }
         let name = &self.cfg.command_name;

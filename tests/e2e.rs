@@ -100,8 +100,8 @@ impl Vcs for FakeGitHub {
     async fn has_write_access(&self, _: &str, user: &str) -> Result<bool> {
         Ok(self.0.lock().unwrap().writers.iter().any(|w| w == user))
     }
-    fn git_auth_header(&self) -> Option<String> {
-        None
+    async fn git_auth_header(&self, _: &str) -> Result<Option<String>> {
+        Ok(None)
     }
     fn secrets(&self) -> Vec<String> {
         vec!["super-secret-token".into()]

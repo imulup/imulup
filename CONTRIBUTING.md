@@ -7,8 +7,9 @@ privately as described in [SECURITY.md](SECURITY.md), not in public issues.
 
 ## Getting started
 
-You need a stable Rust toolchain (1.88 or newer) and `git`. You don't need Pulumi or a GitHub account for the
-tests: the end-to-end tests use a fake GitHub API, a local git remote, and a stub `pulumi` script.
+You need a stable Rust toolchain (1.88 or newer), `git`, and `openssl` (the GitHub App tests generate a throwaway
+key with it). You don't need Pulumi or a GitHub account for the tests: they use a fake GitHub API, a local git
+remote, and a stub `pulumi` script.
 
 ```sh
 git clone <your fork>

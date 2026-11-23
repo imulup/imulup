@@ -1,3 +1,5 @@
 /target
 /imulup-data
 /.rust-review-results
+/deploy/.env
+/deploy/*.pem

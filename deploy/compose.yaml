@@ -1,0 +1,42 @@
+# imulup (Python variant) for a test deployment.
+#
+#   cp deploy/.env.example deploy/.env   # fill in secrets
+#   docker compose -f deploy/compose.yaml up -d
+#
+# Pin a version tag (e.g. :0.1.0-python) instead of :python for reproducible deploys.
+name: imulup
+
+services:
+  imulup:
+    image: ghcr.io/imulup/imulup:python
+    pull_policy: missing
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      IMULUP_DATA_DIR: /data
+      RUST_LOG: ${RUST_LOG:-info}
+    ports:
+      - "${IMULUP_PUBLISH_PORT:-4141}:4141"
+    volumes:
+      - imulup-data:/data
+    # GitHub App private key (see .env.example). Remove these two lines when using a token.
+    secrets:
+      - gh_app_key
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4141/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  imulup-data:
+
+secrets:
+  gh_app_key:
+    file: ./github-app.pem
