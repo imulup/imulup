@@ -212,15 +212,16 @@ mod tests {
             user: "u".into(),
             timeout: Duration::from_secs(10),
         };
-        // SAFETY: test-only; no other threads read this var.
+        // SAFETY: test-only. The name is unique to this test, so no other test thread reads it
+        // (a real flag's variable, like IMULUP_GH_TOKEN, would race with config parsing tests).
         #[allow(unsafe_code)]
         unsafe {
-            std::env::set_var("IMULUP_GH_TOKEN", "sekrit");
+            std::env::set_var("IMULUP_RUNNER_TEST_SECRET", "sekrit");
         };
         let steps = vec![
             Step::Run {
                 run:
-                    "echo out; echo err >&2; echo token=${IMULUP_GH_TOKEN:-none} pull=$IMULUP_PULL"
+                    "echo out; echo err >&2; echo token=${IMULUP_RUNNER_TEST_SECRET:-none} pull=$IMULUP_PULL"
                         .into(),
             },
             Step::Run {

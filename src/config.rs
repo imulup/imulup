@@ -38,11 +38,13 @@ pub struct ServerConfig {
     #[arg(long, env = "IMULUP_GH_APP_ID", requires = "gh_app_key_source")]
     pub gh_app_id: Option<u64>,
 
-    /// GitHub App private key (PEM contents).
+    /// GitHub App private key (PEM contents). Prefer `--gh-app-key-file`: environment variables
+    /// are easier to leak.
     #[arg(long, env = "IMULUP_GH_APP_KEY", hide_env_values = true)]
     pub gh_app_key: Option<String>,
 
-    /// Path to the GitHub App private key (PEM file). It is read once at startup.
+    /// Path to the GitHub App private key (PEM file). It is read once at startup and must not be
+    /// readable by group or others.
     #[arg(long, env = "IMULUP_GH_APP_KEY_FILE")]
     pub gh_app_key_file: Option<PathBuf>,
 
@@ -123,8 +125,12 @@ impl ServerConfig {
         let app_id = self.gh_app_id.context("set --gh-token or --gh-app-id")?;
         let private_key_pem = match (&self.gh_app_key, &self.gh_app_key_file) {
             (Some(k), _) => k.clone(),
-            (None, Some(path)) => std::fs::read_to_string(path)
-                .with_context(|| format!("reading GitHub App key {}", path.display()))?,
+            (None, Some(path)) => {
+                crate::hardening::check_key_file_permissions(path)
+                    .context("unsafe --gh-app-key-file")?;
+                std::fs::read_to_string(path)
+                    .with_context(|| format!("reading GitHub App key {}", path.display()))?
+            }
             (None, None) => anyhow::bail!("--gh-app-id needs --gh-app-key or --gh-app-key-file"),
         };
         Ok(Credentials::App {

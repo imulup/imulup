@@ -3,6 +3,7 @@
 pub mod app;
 pub mod command;
 pub mod config;
+pub mod hardening;
 pub mod render;
 pub mod repo_config;
 pub mod runner;

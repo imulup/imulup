@@ -1,7 +1,9 @@
 //! GitHub App authentication against a fake GitHub API: JWT signing, installation lookup,
-//! installation-token minting and caching, and token use for API calls and git.
+//! scoped installation-token minting and caching, token use for API calls and git, and
+//! revocation when jobs finish.
 #![allow(clippy::unwrap_used)] // test harness helpers
 
+use std::collections::HashSet;
 use std::path::Path;
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -10,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use axum::Json;
 use axum::extract::{Path as UrlPath, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use base64::Engine;
 use imulup::vcs::{Credentials, GitHub, Vcs};
 use serde_json::{Value, json};
@@ -20,6 +22,11 @@ const APP_ID: u64 = 42;
 struct Fake {
     public_key: jsonwebtoken::DecodingKey,
     mints: AtomicUsize,
+    /// Request bodies of token mints.
+    mint_requests: Mutex<Vec<Value>>,
+    /// Tokens minted and not yet revoked.
+    live: Mutex<HashSet<String>>,
+    revoked: Mutex<Vec<String>>,
     comment_auth: Mutex<Vec<String>>,
 }
 
@@ -66,20 +73,36 @@ async fn access_token(
     State(f): State<Shared>,
     UrlPath(id): UrlPath<u64>,
     h: HeaderMap,
+    Json(body): Json<Value>,
 ) -> Result<(StatusCode, Json<Value>), StatusCode> {
     check_jwt(&f, &h)?;
     assert_eq!(id, 7);
+    f.mint_requests.lock().unwrap().push(body);
     let n = f.mints.fetch_add(1, Ordering::SeqCst) + 1;
+    let token = format!("ghs_installation_{n}");
+    f.live.lock().unwrap().insert(token.clone());
     Ok((
         StatusCode::CREATED,
-        Json(
-            json!({"token": format!("ghs_installation_{n}"), "expires_at": "2099-01-01T00:00:00Z"}),
-        ),
+        Json(json!({"token": token, "expires_at": "2099-01-01T00:00:00Z"})),
     ))
 }
 
+async fn revoke(State(f): State<Shared>, h: HeaderMap) -> StatusCode {
+    let token = bearer(&h);
+    if f.live.lock().unwrap().remove(&token) {
+        f.revoked.lock().unwrap().push(token);
+        StatusCode::NO_CONTENT
+    } else {
+        StatusCode::UNAUTHORIZED
+    }
+}
+
 async fn comment(State(f): State<Shared>, h: HeaderMap) -> (StatusCode, Json<Value>) {
-    f.comment_auth.lock().unwrap().push(bearer(&h));
+    let token = bearer(&h);
+    if !f.live.lock().unwrap().contains(&token) {
+        return (StatusCode::UNAUTHORIZED, Json(json!({})));
+    }
+    f.comment_auth.lock().unwrap().push(token);
     (StatusCode::CREATED, Json(json!({})))
 }
 
@@ -108,12 +131,16 @@ async fn app_installation_tokens() {
     let fake = Arc::new(Fake {
         public_key: jsonwebtoken::DecodingKey::from_rsa_pem(&public_pem).unwrap(),
         mints: AtomicUsize::new(0),
+        mint_requests: Mutex::default(),
+        live: Mutex::default(),
+        revoked: Mutex::default(),
         comment_auth: Mutex::default(),
     });
     let router = axum::Router::new()
         .route("/app", get(get_app))
         .route("/repos/{owner}/{repo}/installation", get(installation))
         .route("/app/installations/{id}/access_tokens", post(access_token))
+        .route("/installation/token", delete(revoke))
         .route("/repos/{owner}/{repo}/issues/{n}/comments", post(comment))
         .with_state(fake.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -134,7 +161,8 @@ async fn app_installation_tokens() {
         Some("imulup-test[bot]")
     );
 
-    // API calls use the installation token, and it is cached across calls.
+    // API calls use an installation token, cached across calls (repo names are case-insensitive).
+    gh.job_started("acme/infra");
     gh.comment("acme/infra", 1, "one").await.unwrap();
     gh.comment("ACME/Infra", 1, "two").await.unwrap();
     assert_eq!(fake.mints.load(Ordering::SeqCst), 1);
@@ -143,14 +171,44 @@ async fn app_installation_tokens() {
         ["ghs_installation_1", "ghs_installation_1"]
     );
 
-    // git gets the same token as basic auth, and both forms are redacted.
+    // git gets its own read-only token as basic auth, and both forms are redacted.
     let header = gh.git_auth_header("acme/infra").await.unwrap().unwrap();
     let basic =
-        base64::engine::general_purpose::STANDARD.encode("x-access-token:ghs_installation_1");
+        base64::engine::general_purpose::STANDARD.encode("x-access-token:ghs_installation_2");
     assert_eq!(header, format!("Basic {basic}"));
     let secrets = gh.secrets();
-    assert!(secrets.contains(&"ghs_installation_1".to_string()));
-    assert!(secrets.contains(&basic));
+    for s in ["ghs_installation_1", "ghs_installation_2", basic.as_str()] {
+        assert!(secrets.iter().any(|x| x == s), "{s} not redacted");
+    }
+
+    // Each token covers only this repo and only what that use needs.
+    assert_eq!(
+        *fake.mint_requests.lock().unwrap(),
+        [
+            json!({"repositories": ["infra"], "permissions":
+                {"pull_requests": "write", "issues": "write", "statuses": "write"}}),
+            json!({"repositories": ["infra"], "permissions": {"contents": "read"}}),
+        ]
+    );
+
+    // Tokens survive until the last concurrent job on the repo finishes, then are revoked.
+    gh.job_started("acme/infra");
+    gh.job_finished("acme/infra").await;
+    assert!(fake.revoked.lock().unwrap().is_empty());
+    gh.job_finished("ACME/infra").await;
+    let mut revoked = fake.revoked.lock().unwrap().clone();
+    revoked.sort();
+    assert_eq!(revoked, ["ghs_installation_1", "ghs_installation_2"]);
+    assert_eq!(gh.secrets(), Vec::<String>::new());
+
+    // The next job mints a fresh token rather than reusing a revoked one.
+    gh.job_started("acme/infra");
+    gh.comment("acme/infra", 1, "three").await.unwrap();
+    assert_eq!(
+        fake.comment_auth.lock().unwrap().last().unwrap(),
+        "ghs_installation_3"
+    );
+    gh.job_finished("acme/infra").await;
 
     // Repos the app isn't installed on fail clearly.
     let err = gh.comment("acme/other", 1, "x").await.unwrap_err();

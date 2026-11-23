@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 use imulup::app::App;
@@ -20,7 +20,21 @@ async fn main() -> Result<()> {
         )
         .init();
 
+    match imulup::hardening::make_non_dumpable() {
+        Ok(true) => {}
+        Ok(false) => warn!(
+            "can't mark the process non-dumpable on this platform; \
+             steps may be able to read imulup's environment"
+        ),
+        Err(e) => warn!("marking the process non-dumpable failed: {e:#}"),
+    }
+
     let mut cfg = ServerConfig::parse();
+    if cfg.gh_app_key.is_some() {
+        warn!(
+            "IMULUP_GH_APP_KEY passes the app key in the environment; prefer IMULUP_GH_APP_KEY_FILE"
+        );
+    }
     let allowlist = cfg
         .repo_allowlist_matcher()
         .context("invalid --repo-allowlist")?;
