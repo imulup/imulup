@@ -277,14 +277,40 @@ impl RepoConfig {
 pub fn load(repo_root: &Path) -> Result<Option<RepoConfig>> {
     for name in CONFIG_FILES {
         let path = repo_root.join(name);
-        if path.is_file() {
-            let text = std::fs::read_to_string(&path)?;
+        if path.symlink_metadata().is_ok() {
+            let text = read_regular_file(&path).with_context(|| format!("reading {name}"))?;
             return RepoConfig::parse(&text)
                 .map(Some)
                 .with_context(|| format!("invalid {name}"));
         }
     }
     Ok(None)
+}
+
+/// Reads a file from a PR checkout, refusing symlinks. Parse errors quote the file, so a
+/// symlinked `imulup.yaml` (to `/proc/self/environ`, say) would leak imulup's secrets into a PR
+/// comment. `O_NOFOLLOW` also closes the race with PR code swapping in a symlink after a check.
+fn read_regular_file(path: &Path) -> Result<String> {
+    use std::io::Read;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.read(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::custom_flags(
+        &mut opts,
+        nix::fcntl::OFlag::O_NOFOLLOW.bits() | nix::fcntl::OFlag::O_NONBLOCK.bits(),
+    );
+    let mut file = opts
+        .open(path)
+        .with_context(|| format!("{} must be a regular file, not a symlink", path.display()))?;
+    anyhow::ensure!(
+        file.metadata()?.is_file(),
+        "{} must be a regular file",
+        path.display()
+    );
+    let mut text = String::new();
+    // Bound the read; a config file has no business being large.
+    file.by_ref().take(1 << 20).read_to_string(&mut text)?;
+    Ok(text)
 }
 
 fn is_pulumi_project_dir(dir: &Path) -> bool {
@@ -393,6 +419,28 @@ pub fn modified_projects(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn load_refuses_symlinks() {
+        let tmp = tempfile::tempdir().unwrap();
+        let secret = tmp.path().join("secret");
+        std::fs::write(&secret, "AWS_SECRET_ACCESS_KEY=hunter2").unwrap();
+        let repo = tmp.path().join("repo");
+        std::fs::create_dir(&repo).unwrap();
+        std::os::unix::fs::symlink(&secret, repo.join("imulup.yaml")).unwrap();
+        let err = format!("{:#}", load(&repo).unwrap_err());
+        assert!(err.contains("not a symlink"), "{err}");
+        assert!(!err.contains("hunter2"), "{err}");
+        // A dangling symlink is refused too, rather than treated as "no config".
+        std::fs::remove_file(repo.join("imulup.yaml")).unwrap();
+        std::os::unix::fs::symlink(tmp.path().join("nope"), repo.join("imulup.yaml")).unwrap();
+        assert!(load(&repo).is_err());
+        // A directory named imulup.yaml isn't a config file.
+        std::fs::remove_file(repo.join("imulup.yaml")).unwrap();
+        std::fs::create_dir(repo.join("imulup.yaml")).unwrap();
+        assert!(load(&repo).is_err());
+    }
 
     #[test]
     fn normalizes_paths() {
