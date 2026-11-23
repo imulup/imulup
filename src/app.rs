@@ -331,6 +331,7 @@ impl App {
             head_sha: pull.head_sha.clone(),
             user: user.to_string(),
             timeout: Duration::from_secs(self.cfg.step_timeout_secs),
+            run_as: self.workspaces.step_user().cloned(),
         }
     }
 

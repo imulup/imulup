@@ -35,4 +35,5 @@ Issues in scope include, for example:
 - leaking the GitHub token, an installation token, the GitHub App key, or the webhook secret (into PR comments,
   logs, or the environment of user code)
 - escaping the per-PR workspace with paths from `imulup.yaml` or PR content
+- with `--step-user`, step code reading imulup's secrets, state, or memory, or regaining privileges
 - denial of service against the server from unauthenticated webhook requests

@@ -110,12 +110,33 @@ pub struct ServerConfig {
     #[arg(long, env = "IMULUP_SKIP_COLLABORATOR_CHECK", action = ArgAction::SetTrue, value_parser = BoolishValueParser::new())]
     pub skip_collaborator_check: bool,
 
+    /// Run as this user after startup. imulup must start as root: it reads its secrets and
+    /// prepares the data directory first. Linux only. Empty disables.
+    #[arg(long, env = "IMULUP_SERVER_USER")]
+    pub server_user: Option<String>,
+
+    /// Run checkouts and workflow steps (PR code) as this user, so they can't read imulup's
+    /// secrets, state, or process. Needs `--server-user` (or imulup running as root). Empty
+    /// disables.
+    #[arg(long, env = "IMULUP_STEP_USER")]
+    pub step_user: Option<String>,
+
     /// Maximum seconds a single workflow step may run.
     #[arg(long, env = "IMULUP_STEP_TIMEOUT_SECS", default_value_t = 3600)]
     pub step_timeout_secs: u64,
 }
 
 impl ServerConfig {
+    /// `--server-user`, treating an empty value as unset.
+    pub fn server_user(&self) -> Option<&str> {
+        self.server_user.as_deref().filter(|u| !u.is_empty())
+    }
+
+    /// `--step-user`, treating an empty value as unset.
+    pub fn step_user(&self) -> Option<&str> {
+        self.step_user.as_deref().filter(|u| !u.is_empty())
+    }
+
     /// The GitHub credentials selected by the flags, with the app key file read in.
     pub fn gh_credentials(&self) -> anyhow::Result<crate::vcs::Credentials> {
         use crate::vcs::Credentials;

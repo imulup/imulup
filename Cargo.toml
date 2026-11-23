@@ -50,5 +50,13 @@ missing_panics_doc = "allow"
 must_use_candidate = "allow"
 struct_excessive_bools = "allow" # CLI flag structs
 
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.32.0", default-features = false, features = ["fs", "process", "user"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
-nix = { version = "0.32.0", default-features = false, features = ["process"] }
+caps = "0.5.6"
+
+# Drops privileges process-wide, so it runs as its own binary without the test harness's threads.
+[[test]]
+name = "privsep"
+harness = false
