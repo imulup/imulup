@@ -200,7 +200,7 @@ This works on Linux only.
 
    | Path | Owner | Mode | Notes |
    | --- | --- | --- | --- |
-   | `<data-dir>` | server | `0711` | the step user can't list it |
+   | `<data-dir>` | server | `0755` | listable, since tools like Pulumi walk up parent directories |
    | `state.json` | server | `0600` | |
    | `mirrors/` | server | `0755` | |
    | `repos/` | step | `0755` | |
@@ -209,8 +209,8 @@ This works on Linux only.
    stop steps as the step user, and sets `no_new_privs`.
 3. imulup fetches PR heads, with credentials, into its own bare mirror under `mirrors/`. The step user then checks out from
    that mirror locally, so git credentials never reach a step-user process.
-4. Steps run as the step user with no capabilities. They can't read the key file, `state.json`, imulup's environment or
-   memory, or the mirrors' contents. They can't write to the mirrors or signal imulup.
+4. Steps run as the step user with no capabilities. They can't read the key file, `state.json`, or imulup's environment or
+   memory. They can read the mirrors (that's how checkouts work) but can't write to them or signal imulup.
 
 Outside Docker, create two users and start imulup as root:
 

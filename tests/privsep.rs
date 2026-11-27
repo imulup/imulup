@@ -141,7 +141,7 @@ mod linux {
         .unwrap();
 
         privsep::prepare_data_dir(&data, &server, Some(&steps_user)).unwrap();
-        assert_eq!(mode(&data), 0o711);
+        assert_eq!(mode(&data), 0o755);
         assert_eq!(mode(&data.join("state.json")), 0o600);
         assert_eq!(
             data.join("repos/acme/old/9/file").metadata().unwrap().uid(),
@@ -197,7 +197,8 @@ cat /proc/{pid}/environ >/dev/null 2>&1 && echo LEAK-environ || echo environ-den
 cat /proc/{pid}/mem >/dev/null 2>&1 && echo LEAK-mem || echo mem-denied
 cat {key} >/dev/null 2>&1 && echo LEAK-key || echo key-denied
 cat {data}/state.json >/dev/null 2>&1 && echo LEAK-state || echo state-denied
-ls {data} >/dev/null 2>&1 && echo LEAK-datadir-list || echo datadir-list-denied
+# Pulumi lists every parent directory looking for PulumiPolicy.yaml.
+d=$PWD; while [ "$d" != / ]; do ls "$d" >/dev/null || echo "UNLISTABLE-$d"; d=$(dirname "$d"); done
 touch {data}/mirrors/acme/infra.git/HEAD 2>/dev/null && echo LEAK-mirror-write || echo mirror-write-denied
 kill -0 {pid} 2>/dev/null && echo LEAK-signal || echo signal-denied
 grep CapEff /proc/self/status
@@ -226,6 +227,7 @@ touch "$PWD/probe" && echo checkout-writable
         println!("{out}");
         assert!(r.success, "{out}");
         assert!(!out.contains("LEAK"), "{out}");
+        assert!(!out.contains("UNLISTABLE"), "{out}");
         assert!(
             out.contains(&format!(
                 "uid={} home={} user={STEPS}",
