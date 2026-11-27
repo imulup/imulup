@@ -497,7 +497,61 @@ impl App {
             .iter()
             .any(|r| matches!(r.outcome, Outcome::Failure { .. }));
         self.update_apply_status(pull, any_failed).await;
+        let applied_any = results
+            .iter()
+            .any(|r| r.ok() && !matches!(r.outcome, Outcome::Skipped { .. }));
+        if applied_any && !any_failed {
+            self.maybe_automerge(pull, co).await?;
+        }
         Ok(())
+    }
+
+    /// Merges the PR if automerge is on and every project planned at the current head has a
+    /// successful plan and has been applied (or has nothing to apply).
+    async fn maybe_automerge(&self, pull: &PullRequest, co: &Checkout) -> Result<()> {
+        let enabled = co
+            .config
+            .as_ref()
+            .and_then(|c| c.automerge)
+            .unwrap_or(self.cfg.automerge);
+        if !enabled {
+            return Ok(());
+        }
+        let plans: Vec<PlanRecord> = self
+            .store
+            .plans_for_pull(&pull.repo, pull.number)
+            .into_iter()
+            .filter(|p| p.head_sha == pull.head_sha)
+            .collect();
+        let ready = !plans.is_empty()
+            && plans
+                .iter()
+                .all(|p| p.succeeded && (p.applied || p.has_changes == Some(false)));
+        if !ready {
+            return Ok(());
+        }
+        let method = self.cfg.automerge_method;
+        let body = match self
+            .vcs
+            .merge(&pull.repo, pull.number, &pull.head_sha, method)
+            .await
+        {
+            Ok(()) => {
+                info!(repo = %pull.repo, number = pull.number, "automerged");
+                format!(
+                    "Automatically merged (`{}`): every planned project was applied.",
+                    method.as_str()
+                )
+            }
+            Err(e) => {
+                warn!(repo = %pull.repo, number = pull.number, "automerge failed: {e:#}");
+                format!(
+                    "## ⚠️ Automerge failed\n\nEvery planned project was applied, but the merge failed:\n\n{}\n\nMerge the PR yourself once that's resolved.",
+                    render::fence(&render::redact(&format!("{e:#}"), &self.secrets()), "")
+                )
+            }
+        };
+        self.vcs.comment(&pull.repo, pull.number, &body).await
     }
 
     /// Returns why `p` can't be applied right now, if it can't.

@@ -11,7 +11,7 @@ use clap::Parser;
 use imulup::app::{App, Event};
 use imulup::config::ServerConfig;
 use imulup::state::Store;
-use imulup::vcs::{PullRequest, StatusState, Vcs};
+use imulup::vcs::{MergeMethod, PullRequest, StatusState, Vcs};
 use imulup::workspace::Workspaces;
 
 #[derive(Default)]
@@ -22,6 +22,9 @@ struct FakeState {
     statuses: Vec<(String, StatusState, String)>,
     approved: bool,
     writers: Vec<String>,
+    /// (pull, sha, method) of each merge.
+    merges: Vec<(u64, String, MergeMethod)>,
+    merge_error: Option<String>,
 }
 
 #[derive(Default, Clone)]
@@ -99,6 +102,14 @@ impl Vcs for FakeGitHub {
     }
     async fn has_write_access(&self, _: &str, user: &str) -> Result<bool> {
         Ok(self.0.lock().unwrap().writers.iter().any(|w| w == user))
+    }
+    async fn merge(&self, _: &str, number: u64, sha: &str, method: MergeMethod) -> Result<()> {
+        let mut s = self.0.lock().unwrap();
+        if let Some(e) = &s.merge_error {
+            anyhow::bail!("{e}");
+        }
+        s.merges.push((number, sha.to_string(), method));
+        Ok(())
     }
     async fn git_auth_header(&self, _: &str) -> Result<Option<String>> {
         Ok(None)
@@ -481,4 +492,84 @@ workflows:
         .await;
     let c = h.gh.last_comment();
     assert!(c.contains("invalid imulup.yaml"), "{c}");
+}
+
+#[tokio::test]
+async fn automerge_after_every_project_is_applied() {
+    let h = Harness::new(&["--automerge", "--automerge-method=squash"]);
+    let sha = h.open_pr(1, &["infra/index.ts"]);
+    h.app
+        .handle(Event::PullUpdated {
+            repo: "o/r".into(),
+            number: 1,
+        })
+        .await;
+    let merges = || h.gh.0.lock().unwrap().merges.clone();
+
+    // One of two projects applied: no merge yet.
+    let c = h.comment(1, "alice", "imulup apply -d infra -s dev").await;
+    assert!(c.contains("1/1 project succeeded"), "{c}");
+    assert_eq!(merges(), []);
+
+    // The last one applied: merged, pinned to the planned head.
+    h.comment(1, "alice", "imulup apply -d infra -s prod").await;
+    assert_eq!(merges(), [(1, sha, MergeMethod::Squash)]);
+    assert!(
+        h.gh.last_comment()
+            .contains("Automatically merged (`squash`)")
+    );
+
+    // A failed merge is reported, not swallowed.
+    let h = Harness::new(&["--automerge"]);
+    h.open_pr(2, &["infra/index.ts"]);
+    h.gh.0.lock().unwrap().merge_error = Some("Required status check \"ci\" is expected.".into());
+    h.comment(2, "alice", "imulup plan").await;
+    h.comment(2, "alice", "imulup apply").await;
+    let c = h.gh.last_comment();
+    assert!(c.contains("Automerge failed"), "{c}");
+    assert!(c.contains("Required status check"), "{c}");
+}
+
+#[tokio::test]
+async fn automerge_skips_failed_plans_and_respects_repo_config() {
+    // A project whose plan failed blocks automerge even after the others apply.
+    let h = Harness::new(&["--automerge"]);
+    write(
+        h.src.join("imulup.yaml"),
+        "version: 1\nprojects:\n  - {dir: infra, stack: dev}\n  - {dir: infra, stack: broken}\n",
+    );
+    sh(&h.src, &["add", "-A"]);
+    sh(&h.src, &["commit", "-q", "-m", "config"]);
+    h.open_pr(1, &["infra/index.ts"]);
+    let c = h.comment(1, "alice", "imulup plan").await;
+    assert!(c.contains("1/2 projects succeeded"), "{c}");
+    h.comment(1, "alice", "imulup apply -d infra -s dev").await;
+    assert_eq!(h.gh.0.lock().unwrap().merges.len(), 0);
+
+    // `automerge: false` in imulup.yaml turns it off for the repo.
+    let h = Harness::new(&["--automerge"]);
+    write(
+        h.src.join("imulup.yaml"),
+        "version: 1\nautomerge: false\nprojects:\n  - {dir: infra, stack: dev}\n",
+    );
+    sh(&h.src, &["add", "-A"]);
+    sh(&h.src, &["commit", "-q", "-m", "config"]);
+    h.open_pr(1, &["infra/index.ts"]);
+    h.comment(1, "alice", "imulup plan").await;
+    let c = h.comment(1, "alice", "imulup apply").await;
+    assert!(c.contains("1/1 project succeeded"), "{c}");
+    assert_eq!(h.gh.0.lock().unwrap().merges.len(), 0);
+
+    // ...and `automerge: true` turns it on without the server flag.
+    let h = Harness::new(&[]);
+    write(
+        h.src.join("imulup.yaml"),
+        "version: 1\nautomerge: true\nprojects:\n  - {dir: infra, stack: dev}\n",
+    );
+    sh(&h.src, &["add", "-A"]);
+    sh(&h.src, &["commit", "-q", "-m", "config"]);
+    h.open_pr(1, &["infra/index.ts"]);
+    h.comment(1, "alice", "imulup plan").await;
+    h.comment(1, "alice", "imulup apply").await;
+    assert_eq!(h.gh.0.lock().unwrap().merges.len(), 1);
 }
