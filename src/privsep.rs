@@ -45,8 +45,8 @@ pub fn is_root() -> bool {
 /// Creates the data directory layout with ownership and modes for privilege separation. Runs as
 /// root, before [`drop_privileges`].
 ///
-/// * `<data_dir>`: server user, `0711`, so the step user can reach its own subdirectories but
-///   can't list the rest
+/// * `<data_dir>`: server user, `0755`. Tools such as `pulumi install` list every parent of the
+///   working directory, so the step user must be able to list it; it only holds the entries below.
 /// * `<data_dir>/state.json`: server user, `0600`
 /// * `<data_dir>/mirrors`: server user, `0755`, read-only to the step user
 /// * `<data_dir>/repos`: step user, `0755`, readable by imulup for `imulup.yaml`
@@ -54,7 +54,7 @@ pub fn is_root() -> bool {
 /// Trees left by an earlier version (or a different user) are re-owned.
 pub fn prepare_data_dir(data_dir: &Path, server: &Identity, step: Option<&Identity>) -> Result<()> {
     std::fs::create_dir_all(data_dir)?;
-    own(data_dir, server, if step.is_some() { 0o711 } else { 0o700 })?;
+    own(data_dir, server, if step.is_some() { 0o755 } else { 0o700 })?;
     for name in ["state.json", "state.json.tmp"] {
         let path = data_dir.join(name);
         if let Ok(meta) = path.symlink_metadata() {
