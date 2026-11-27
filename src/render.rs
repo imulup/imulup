@@ -79,7 +79,7 @@ fn diffify(text: &str) -> String {
         .join("\n")
 }
 
-fn fence(text: &str, lang: &str) -> String {
+pub fn fence(text: &str, lang: &str) -> String {
     // Neutralize backtick fences inside output so they can't break out of the code block.
     let safe = text.trim_end().replace("```", "`\u{200b}``");
     format!("```{lang}\n{safe}\n```")

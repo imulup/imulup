@@ -19,6 +19,11 @@ has a plan for a stack, that stack is locked so no other PR can plan or apply it
 * **Locks.** Each lock covers one `(repo, dir, stack)` and belongs to the PR that planned it. imulup releases the lock when that PR is merged or closed, or when someone comments `imulup unlock`.
 * **Stale-plan protection.** `apply` only runs when there is a successful plan for the PR's current head commit. Any new push means you must plan again.
 * **Apply requirements.** You can require `approved` and/or `mergeable` per project, or server-wide.
+* **Automerge.** With `--automerge` (or `automerge: true` in `imulup.yaml`), imulup merges the PR once every project
+  planned at its current head has a successful plan and has been applied, or has no changes. If any plan failed, or
+  only some projects were applied, the PR stays open. The merge is pinned to the planned commit, and your branch
+  protection rules still apply. `--automerge-method` picks `merge` (the default), `squash`, or `rebase`. If GitHub
+  refuses the merge, imulup comments with the reason.
 * **Commit statuses.** imulup sets `imulup/plan` and `imulup/apply` statuses. Mark them as required checks to block merging until changes are applied.
 * **Lock view.** `GET /` shows an HTML table of the locks. `GET /api/locks` returns them as JSON.
 
@@ -45,6 +50,7 @@ By default, only users with write access to the repo can run commands. Turn this
 
 ```yaml
 version: 1
+automerge: true                 # optional; overrides the server's --automerge for this repo
 projects:
   - name: network-prod          # optional; enables `-p network-prod`
     dir: network
@@ -87,8 +93,8 @@ imulup authenticates to GitHub as either a **GitHub App** (recommended) or a use
 Create a GitHub App (*Settings → Developer settings → GitHub Apps*) with:
 
 * **Webhook URL:** `https://<host>/events`, **secret:** the same value as `IMULUP_GH_WEBHOOK_SECRET`
-* **Repository permissions:** Contents *read*, Pull requests *read & write*, Issues *read & write*,
-  Commit statuses *read & write*, Metadata *read*
+* **Repository permissions:** Contents *read* (*read & write* for automerge), Pull requests *read & write*,
+  Issues *read & write*, Commit statuses *read & write*, Metadata *read*
 * **Subscribe to events:** *Pull request* and *Issue comment*
 
 Generate a private key, install the app on your repos, and run:
@@ -107,7 +113,8 @@ others (`chmod 600`), or imulup refuses to start. The app's own webhook delivers
 repository webhook.
 
 For each repo, imulup mints short-lived installation tokens that cover only that repo. API calls get a token limited
-to pull requests, issues, and statuses. git fetches get a separate `contents: read` token. Tokens are refreshed every
+to pull requests, issues, and statuses. git fetches get a separate `contents: read` token. Automerge, and only
+automerge, gets a third token with `contents: write`, minted at merge time. Tokens are refreshed every
 45 minutes and revoked once no job on the repo is running.
 
 ### With a token

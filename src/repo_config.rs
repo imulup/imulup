@@ -135,6 +135,9 @@ pub struct ProjectConfig {
 #[serde(deny_unknown_fields)]
 pub struct RepoConfig {
     pub version: u32,
+    /// Overrides the server's `--automerge` for this repo.
+    #[serde(default)]
+    pub automerge: Option<bool>,
     #[serde(default)]
     pub projects: Vec<ProjectConfig>,
     #[serde(default)]
@@ -419,6 +422,18 @@ pub fn modified_projects(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn example_config_parses() {
+        let cfg = RepoConfig::parse(include_str!("../examples/imulup.yaml")).unwrap();
+        assert_eq!(cfg.automerge, Some(true));
+        assert!(
+            RepoConfig::parse("version: 1\n")
+                .unwrap()
+                .automerge
+                .is_none()
+        );
+    }
 
     #[cfg(unix)]
     #[test]

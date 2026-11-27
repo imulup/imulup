@@ -12,9 +12,9 @@ use std::sync::{Arc, Mutex};
 use axum::Json;
 use axum::extract::{Path as UrlPath, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 use base64::Engine;
-use imulup::vcs::{Credentials, GitHub, Vcs};
+use imulup::vcs::{Credentials, GitHub, MergeMethod, Vcs};
 use serde_json::{Value, json};
 
 const APP_ID: u64 = 42;
@@ -28,6 +28,8 @@ struct Fake {
     live: Mutex<HashSet<String>>,
     revoked: Mutex<Vec<String>>,
     comment_auth: Mutex<Vec<String>>,
+    /// (token, body) of each merge request.
+    merges: Mutex<Vec<(String, Value)>>,
 }
 
 type Shared = Arc<Fake>;
@@ -97,6 +99,26 @@ async fn revoke(State(f): State<Shared>, h: HeaderMap) -> StatusCode {
     }
 }
 
+async fn merge(
+    State(f): State<Shared>,
+    UrlPath((_, _, n)): UrlPath<(String, String, u64)>,
+    h: HeaderMap,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    let token = bearer(&h);
+    if !f.live.lock().unwrap().contains(&token) {
+        return (StatusCode::UNAUTHORIZED, Json(json!({})));
+    }
+    f.merges.lock().unwrap().push((token, body));
+    if n == 2 {
+        return (
+            StatusCode::METHOD_NOT_ALLOWED,
+            Json(json!({"message": "At least 1 approving review is required"})),
+        );
+    }
+    (StatusCode::OK, Json(json!({"merged": true})))
+}
+
 async fn comment(State(f): State<Shared>, h: HeaderMap) -> (StatusCode, Json<Value>) {
     let token = bearer(&h);
     if !f.live.lock().unwrap().contains(&token) {
@@ -117,6 +139,7 @@ fn openssl(dir: &Path, args: &[&str]) {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)] // one token lifecycle, step by step; splitting it hides the order
 async fn app_installation_tokens() {
     // Generate a throwaway key rather than committing one.
     let tmp = tempfile::tempdir().unwrap();
@@ -135,6 +158,7 @@ async fn app_installation_tokens() {
         live: Mutex::default(),
         revoked: Mutex::default(),
         comment_auth: Mutex::default(),
+        merges: Mutex::default(),
     });
     let router = axum::Router::new()
         .route("/app", get(get_app))
@@ -142,6 +166,7 @@ async fn app_installation_tokens() {
         .route("/app/installations/{id}/access_tokens", post(access_token))
         .route("/installation/token", delete(revoke))
         .route("/repos/{owner}/{repo}/issues/{n}/comments", post(comment))
+        .route("/repos/{owner}/{repo}/pulls/{n}/merge", put(merge))
         .with_state(fake.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let api = format!("http://{}", listener.local_addr().unwrap());
@@ -208,7 +233,40 @@ async fn app_installation_tokens() {
         fake.comment_auth.lock().unwrap().last().unwrap(),
         "ghs_installation_3"
     );
+
+    // Merging uses its own token, the only one with write access to code, pinned to the sha.
+    gh.merge("acme/infra", 1, "abc123", MergeMethod::Squash)
+        .await
+        .unwrap();
+    assert_eq!(
+        fake.mint_requests.lock().unwrap().last().unwrap(),
+        &json!({"repositories": ["infra"], "permissions":
+            {"contents": "write", "pull_requests": "write"}})
+    );
+    assert_eq!(
+        *fake.merges.lock().unwrap(),
+        [(
+            "ghs_installation_4".to_string(),
+            json!({"sha": "abc123", "merge_method": "squash"})
+        )]
+    );
+    // GitHub's reason for refusing a merge is passed on.
+    let err = gh
+        .merge("acme/infra", 2, "abc123", MergeMethod::Merge)
+        .await
+        .unwrap_err();
+    assert!(
+        format!("{err:#}").contains("405 Method Not Allowed): At least 1 approving review"),
+        "{err:#}"
+    );
     gh.job_finished("acme/infra").await;
+    assert!(
+        fake.revoked
+            .lock()
+            .unwrap()
+            .contains(&"ghs_installation_4".to_string()),
+        "the merge token is revoked with the others"
+    );
 
     // Repos the app isn't installed on fail clearly.
     let err = gh.comment("acme/other", 1, "x").await.unwrap_err();

@@ -1,5 +1,7 @@
 # Example imulup.yaml — place at the repo root.
 version: 1
+# Merge the PR once every planned project is applied (overrides the server's --automerge).
+automerge: true
 projects:
   - name: network-prod
     dir: network

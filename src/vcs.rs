@@ -43,6 +43,25 @@ impl StatusState {
     }
 }
 
+/// How to merge a pull request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
+pub enum MergeMethod {
+    #[default]
+    Merge,
+    Squash,
+    Rebase,
+}
+
+impl MergeMethod {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MergeMethod::Merge => "merge",
+            MergeMethod::Squash => "squash",
+            MergeMethod::Rebase => "rebase",
+        }
+    }
+}
+
 #[async_trait]
 pub trait Vcs: Send + Sync {
     async fn get_pull(&self, repo: &str, number: u64) -> Result<PullRequest>;
@@ -61,6 +80,8 @@ pub trait Vcs: Send + Sync {
     /// True if someone other than `author` has an outstanding approving review.
     async fn is_approved(&self, repo: &str, number: u64, author: &str) -> Result<bool>;
     async fn has_write_access(&self, repo: &str, user: &str) -> Result<bool>;
+    /// Merges the PR, but only if its head is still `sha`.
+    async fn merge(&self, repo: &str, number: u64, sha: &str, method: MergeMethod) -> Result<()>;
     /// `Authorization` header value git should send when fetching `repo`, if any.
     async fn git_auth_header(&self, repo: &str) -> Result<Option<String>>;
     /// Strings that must never appear in comments or logs.
@@ -115,6 +136,8 @@ struct AppAuth {
 enum Scope {
     Api,
     Git,
+    /// Only minted when imulup merges a PR (automerge), so other tokens stay read-only on code.
+    Merge,
 }
 
 impl Scope {
@@ -128,6 +151,7 @@ impl Scope {
                 "statuses": "write",
             }),
             Scope::Git => json!({"contents": "read"}),
+            Scope::Merge => json!({"contents": "write", "pull_requests": "write"}),
         }
     }
 }
@@ -547,6 +571,28 @@ impl Vcs for GitHub {
         Ok(latest.values().any(|s| s == "APPROVED"))
     }
 
+    async fn merge(&self, repo: &str, number: u64, sha: &str, method: MergeMethod) -> Result<()> {
+        let token = self.token(repo, Scope::Merge).await?;
+        let body = json!({"sha": sha, "merge_method": method.as_str()});
+        let (status, value) = self
+            .request_with(
+                &token,
+                Method::PUT,
+                &format!("/repos/{repo}/pulls/{number}/merge"),
+                Some(body),
+            )
+            .await?;
+        if status.is_success() {
+            return Ok(());
+        }
+        // 405: not mergeable (branch protection, conflicts); 409: the head moved.
+        let reason = value["message"].as_str().map_or_else(
+            || truncate(&value.to_string(), 300).to_string(),
+            String::from,
+        );
+        bail!("GitHub refused the merge ({status}): {reason}");
+    }
+
     async fn has_write_access(&self, repo: &str, user: &str) -> Result<bool> {
         let (status, value) = self
             .request(
@@ -612,7 +658,7 @@ impl Vcs for GitHub {
             }
             jobs.remove(&key);
             let mut tokens = lock(&app.tokens);
-            [Scope::Api, Scope::Git]
+            [Scope::Api, Scope::Git, Scope::Merge]
                 .into_iter()
                 .filter_map(|scope| tokens.remove(&(key.clone(), scope)))
                 .flat_map(|t| std::iter::once(t.token).chain(t.previous))

@@ -110,6 +110,15 @@ pub struct ServerConfig {
     #[arg(long, env = "IMULUP_SKIP_COLLABORATOR_CHECK", action = ArgAction::SetTrue, value_parser = BoolishValueParser::new())]
     pub skip_collaborator_check: bool,
 
+    /// Merge PRs once every planned project has been applied successfully. Repos can override
+    /// this with `automerge:` in `imulup.yaml`. GitHub Apps need Contents read & write for it.
+    #[arg(long, env = "IMULUP_AUTOMERGE", action = ArgAction::SetTrue, value_parser = BoolishValueParser::new())]
+    pub automerge: bool,
+
+    /// How automerge merges PRs.
+    #[arg(long, env = "IMULUP_AUTOMERGE_METHOD", value_enum, default_value_t)]
+    pub automerge_method: crate::vcs::MergeMethod,
+
     /// Run as this user after startup. imulup must start as root: it reads its secrets and
     /// prepares the data directory first. Linux only. Empty disables.
     #[arg(long, env = "IMULUP_SERVER_USER")]
