@@ -1,0 +1,39 @@
+---
+title: imulup
+description: Atlantis-style pull request automation for Pulumi, written in Rust.
+template: splash
+hero:
+  tagline: Run <code>pulumi preview</code> on every pull request, review the diff in a comment, and apply with <code>imulup apply</code>.
+  actions:
+    - text: Quickstart
+      link: /imulup/quickstart/
+      icon: right-arrow
+    - text: How it works
+      link: /imulup/overview/
+      variant: minimal
+    - text: GitHub
+      link: https://github.com/imulup/imulup
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid>
+	<Card title="Plan in the PR" icon="document">
+		When a pull request changes a Pulumi project, imulup runs `pulumi preview` and posts the diff as a
+		comment. Every stack the PR touches gets its own section.
+	</Card>
+	<Card title="Apply from a comment" icon="rocket">
+		Reviewers comment `imulup apply` to run `pulumi up`. An apply only runs against a successful plan of the PR's
+		current head commit.
+	</Card>
+	<Card title="Locks per stack" icon="seti:lock">
+		While a PR has a plan for a stack, no other PR can plan or apply that stack. The lock is released when the PR
+		merges, closes, or someone comments `imulup unlock`.
+	</Card>
+	<Card title="Built for arbitrary code" icon="warning">
+		Pulumi programs are real programs. imulup runs them as a separate unprivileged user, with short-lived,
+		single-repo GitHub tokens that never reach PR code.
+	</Card>
+</CardGrid>
