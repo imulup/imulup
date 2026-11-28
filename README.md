@@ -6,6 +6,8 @@ imulup listens for GitHub webhooks. When a PR changes a Pulumi project it runs `
 posts the diff as a PR comment. Reviewers then comment `imulup apply` to run `pulumi up`. While a PR
 has a plan for a stack, that stack is locked so no other PR can plan or apply it in the meantime.
 
+**Documentation:** <https://docs.imulup.com/>
+
 ## How it works
 
 | Atlantis | imulup |

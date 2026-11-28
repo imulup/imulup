@@ -2,3 +2,4 @@ target
 imulup-data
 .git
 .rust-review-results
+docs

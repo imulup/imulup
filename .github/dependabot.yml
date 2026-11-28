@@ -26,3 +26,13 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      docs:
+        patterns: ["*"]
