@@ -79,14 +79,14 @@ workflows:
   default to `["**/*"]`. They can reach outside it, like `../shared/**`, but not outside the repository.
 - **`autoplan.enabled: false`** stops automatic plans for the project. A bare `imulup plan` still plans it if it's
   modified, and so does `imulup plan -p dns`.
-- **`workflow`** names a workflow under `workflows:`. See [Workflows](/imulup/usage/workflows/).
+- **`workflow`** names a workflow under `workflows:`. See [Workflows](/usage/workflows/).
 
-The full schema is in the [`imulup.yaml` reference](/imulup/reference/repo-config/).
+The full schema is in the [`imulup.yaml` reference](/reference/repo-config/).
 
 ## Several stacks and projects in one PR
 
 A PR that touches several projects gets one plan comment covering all of them. Projects run one after another, and
-each takes its own [lock](/imulup/usage/locking/), so one locked or failing project doesn't stop the rest.
+each takes its own [lock](/usage/locking/), so one locked or failing project doesn't stop the rest.
 
 `imulup apply` with no options then applies every project with a successful plan. To apply in a set order, such as
 `dev` before `prod`, apply them one at a time:

@@ -16,7 +16,7 @@ own token, your own `imulup apply` comments are ignored too. Create a separate m
 Sign in as the bot account and create a token under **Settings → Developer settings → Personal access tokens**.
 
 - **Fine-grained token:** limit it to the repositories imulup manages, with these repository permissions:
-  - Contents: *Read-only* (*Read and write* for [automerge](/imulup/usage/automerge/))
+  - Contents: *Read-only* (*Read and write* for [automerge](/usage/automerge/))
   - Pull requests: *Read and write*
   - Issues: *Read and write*
   - Commit statuses: *Read and write*

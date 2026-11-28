@@ -29,11 +29,11 @@ Set exactly one of `--gh-token` or `--gh-app-id`.
 | --- | --- | --- | --- |
 | `--disable-autoplan` | `IMULUP_DISABLE_AUTOPLAN` | `false` | Don't plan automatically when PRs are opened or pushed to. |
 | `--plan-drafts` | `IMULUP_PLAN_DRAFTS` | `false` | Autoplan draft PRs too. |
-| `--allow-fork-prs` | `IMULUP_ALLOW_FORK_PRS` | `false` | Run on PRs from forks. Their code runs with your credentials: see the [security model](/imulup/security/model/). |
+| `--allow-fork-prs` | `IMULUP_ALLOW_FORK_PRS` | `false` | Run on PRs from forks. Their code runs with your credentials: see the [security model](/security/model/). |
 | `--skip-collaborator-check` | `IMULUP_SKIP_COLLABORATOR_CHECK` | `false` | Let anyone who can comment run commands, not just users with write access. |
-| `--require-approval` | `IMULUP_REQUIRE_APPROVAL` | `false` | Add the `approved` [apply requirement](/imulup/usage/apply-requirements/) to every project. |
+| `--require-approval` | `IMULUP_REQUIRE_APPROVAL` | `false` | Add the `approved` [apply requirement](/usage/apply-requirements/) to every project. |
 | `--require-mergeable` | `IMULUP_REQUIRE_MERGEABLE` | `false` | Add the `mergeable` apply requirement to every project. |
-| `--automerge` | `IMULUP_AUTOMERGE` | `false` | Merge PRs once every planned project is applied. Repos can override it in `imulup.yaml`. See [Automerge](/imulup/usage/automerge/). |
+| `--automerge` | `IMULUP_AUTOMERGE` | `false` | Merge PRs once every planned project is applied. Repos can override it in `imulup.yaml`. See [Automerge](/usage/automerge/). |
 | `--automerge-method` | `IMULUP_AUTOMERGE_METHOD` | `merge` | `merge`, `squash` or `rebase`. |
 | `--command-name` | `IMULUP_COMMAND_NAME` | `imulup` | The word that starts PR comment commands. |
 | `--step-timeout-secs` | `IMULUP_STEP_TIMEOUT_SECS` | `3600` | The longest a single workflow step may run, in seconds. |
@@ -47,14 +47,14 @@ Set exactly one of `--gh-token` or `--gh-app-id`.
 | `--data-dir` | `IMULUP_DATA_DIR` | `./imulup-data` (`/data` in the images) | Lock state, git mirrors and PR checkouts. |
 | `--pulumi-bin` | `IMULUP_PULUMI_BIN` | `pulumi` | The Pulumi CLI to run. |
 | `--server-user` | `IMULUP_SERVER_USER` | unset (`imulup` in the images) | Switch to this user after startup. Needs root. Linux only. Empty disables it. |
-| `--step-user` | `IMULUP_STEP_USER` | unset (`imulup-runner` in the images) | Run checkouts and steps as this user. Empty disables it. See [Privilege separation](/imulup/security/privilege-separation/). |
+| `--step-user` | `IMULUP_STEP_USER` | unset (`imulup-runner` in the images) | Run checkouts and steps as this user. Empty disables it. See [Privilege separation](/security/privilege-separation/). |
 
 ## Other environment variables
 
 | Variable | Description |
 | --- | --- |
 | `RUST_LOG` | Log filter, such as `info` (the default), `debug` or `imulup=debug`. |
-| `PULUMI_*`, cloud credentials | Not read by imulup. They pass through to steps. See [Cloud credentials](/imulup/pulumi/credentials/). |
+| `PULUMI_*`, cloud credentials | Not read by imulup. They pass through to steps. See [Cloud credentials](/pulumi/credentials/). |
 
 imulup sets `PULUMI_SKIP_UPDATE_CHECK=true` and `CI=true` for every step.
 

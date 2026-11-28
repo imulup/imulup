@@ -1,17 +1,28 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import catppuccin from '@catppuccin/starlight';
+import baseLinks from './src/plugins/base-links.mjs';
 
-// Published to GitHub Pages at https://imulup.github.io/imulup/. If you move the site to a custom
-// domain, change `site`, drop `base`, and replace the `/imulup/` prefix in page links.
+// Where the site is served. To move the docs later:
+//   docs.imulup.com  → SITE = 'https://docs.imulup.com', BASE = '/'
+//   imulup.com/docs  → SITE = 'https://imulup.com',      BASE = '/docs'
+// Page links are written root-relative (`/usage/locking/`); `baseLinks` adds BASE to them.
+const SITE = 'https://imulup.com';
+const BASE = '/';
+
 export default defineConfig({
-	site: 'https://imulup.github.io',
-	base: '/imulup',
+	site: SITE,
+	base: BASE,
+	markdown: {
+		rehypePlugins: [baseLinks(BASE)],
+	},
 	integrations: [
 		starlight({
 			title: 'imulup',
 			description: 'Atlantis-style pull request automation for Pulumi.',
 			favicon: '/favicon.svg',
+			plugins: [catppuccin()],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/imulup/imulup' }],
 			editLink: { baseUrl: 'https://github.com/imulup/imulup/edit/main/docs/' },
 			lastUpdated: true,

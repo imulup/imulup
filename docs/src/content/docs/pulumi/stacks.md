@@ -5,12 +5,12 @@ description: How imulup decides which stacks to plan, and how to create stacks o
 
 imulup always runs Pulumi with an explicit `--stack`. The stack name comes from one of two places:
 
-- With an [`imulup.yaml`](/imulup/reference/repo-config/), it's each project's `stack:`.
+- With an [`imulup.yaml`](/reference/repo-config/), it's each project's `stack:`.
 - Without one, imulup finds the Pulumi project that a modified file belongs to, and plans every stack with a
   `Pulumi.<stack>.yaml` file next to its `Pulumi.yaml`. A project with `Pulumi.dev.yaml` and `Pulumi.prod.yaml` gets
   two plans, `dev` and `prod`.
 
-See [Projects and stacks](/imulup/usage/projects/) for how imulup matches modified files to projects.
+See [Projects and stacks](/usage/projects/) for how imulup matches modified files to projects.
 
 ## Qualified stack names
 

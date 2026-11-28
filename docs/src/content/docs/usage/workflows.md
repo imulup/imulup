@@ -56,7 +56,7 @@ Each step has a time limit, set by `--step-timeout-secs` (default one hour). A s
 and fails.
 
 `run:` steps get a few `IMULUP_*` variables describing the job, such as `IMULUP_STACK` and `IMULUP_PULL`. See the
-[step environment](/imulup/reference/step-environment/).
+[step environment](/reference/step-environment/).
 
 ## Installing dependencies
 

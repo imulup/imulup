@@ -4,7 +4,7 @@ description: The endpoints the imulup server exposes.
 ---
 
 imulup serves HTTP on `--bind`:`--port` (`0.0.0.0:4141` by default). It doesn't terminate TLS: put a reverse proxy in
-front of it. See [Running in production](/imulup/install/production/).
+front of it. See [Running in production](/install/production/).
 
 ## `POST /events`
 
@@ -32,7 +32,7 @@ Returns `200 ok` while the server is running.
 
 ## `GET /`
 
-An HTML page listing the held [locks](/imulup/usage/locking/), with links to the PRs that hold them.
+An HTML page listing the held [locks](/usage/locking/), with links to the PRs that hold them.
 
 ## `GET /api/locks`
 

@@ -30,7 +30,7 @@ You can leave the OAuth, callback, setup URL and device-flow settings empty. imu
 
 | Permission | Access | Used for |
 | --- | --- | --- |
-| Contents | *Read-only* (*Read and write* for [automerge](/imulup/usage/automerge/)) | Fetching PR heads; merging |
+| Contents | *Read-only* (*Read and write* for [automerge](/usage/automerge/)) | Fetching PR heads; merging |
 | Pull requests | *Read and write* | Reading PRs, changed files and reviews; merging |
 | Issues | *Read and write* | PR comments and 👀 reactions (PR comments use the Issues API) |
 | Commit statuses | *Read and write* | `imulup/plan` and `imulup/apply` statuses |
@@ -68,7 +68,7 @@ comments from that login, so it never responds to itself.
   others, so `chmod 600` it, or `chmod 400` and root-owned with privilege separation.
 - `IMULUP_GH_APP_KEY` with the PEM contents also works, but imulup warns: environment variables leak more easily.
 - imulup reads the key once at startup, before it drops privileges. With
-  [privilege separation](/imulup/security/privilege-separation/), the file can be readable by root alone.
+  [privilege separation](/security/privilege-separation/), the file can be readable by root alone.
 
 A leaked app key can mint tokens for every installation of the app. Install the app only where imulup needs it, and
 rotate the key if you suspect it leaked: generate a new key, restart imulup with it, then delete the old key in

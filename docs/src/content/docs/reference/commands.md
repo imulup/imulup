@@ -49,7 +49,7 @@ repository.
 | `imulup apply -d <dir> [-s <stack>]` | The matching projects |
 
 Each project still needs a successful, unapplied plan at the PR's current commit, and has to meet its
-[apply requirements](/imulup/usage/apply-requirements/). Projects that don't are skipped, with the reason in the
+[apply requirements](/usage/apply-requirements/). Projects that don't are skipped, with the reason in the
 comment.
 
 ## `unlock`
@@ -58,7 +58,7 @@ comment.
 imulup unlock
 ```
 
-Releases every lock the PR holds and discards its plans. It takes no options. See [Locking](/imulup/usage/locking/).
+Releases every lock the PR holds and discards its plans. It takes no options. See [Locking](/usage/locking/).
 
 ## Permissions
 

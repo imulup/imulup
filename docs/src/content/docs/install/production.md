@@ -16,7 +16,7 @@ proxy's auth:
 | `GET /` | No | HTML table of the held locks |
 | `GET /api/locks` | No | The held locks as JSON |
 
-The lock pages show repository names, stack names and PR authors. See the [HTTP reference](/imulup/reference/http/).
+The lock pages show repository names, stack names and PR authors. See the [HTTP reference](/reference/http/).
 
 ## Behind nginx
 
@@ -68,7 +68,7 @@ Everything imulup keeps is under `IMULUP_DATA_DIR` (`/data` in the images):
 Only `state.json` matters. The mirrors and checkouts are caches: imulup recreates them on the next fetch. If you lose
 `state.json`, every lock and plan is dropped, and open PRs just need a fresh `imulup plan`.
 
-Pulumi's own state isn't here. It lives in your [Pulumi backend](/imulup/pulumi/backends/).
+Pulumi's own state isn't here. It lives in your [Pulumi backend](/pulumi/backends/).
 
 To back up, copy `state.json` while imulup is idle, or snapshot the volume.
 

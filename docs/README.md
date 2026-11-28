@@ -5,8 +5,8 @@ The documentation site, built with [Starlight](https://starlight.astro.build/). 
 
 ```sh
 npm ci
-npm run dev      # http://localhost:4321/imulup/
+npm run dev      # http://localhost:4321/
 npm run build    # static site in dist/
 ```
 
-Pushes to `main` that touch `docs/` deploy to GitHub Pages (`.github/workflows/docs.yml`).
+Pushes to `main` that touch `docs/` deploy to GitHub Pages at <https://imulup.com/> (`.github/workflows/docs.yml`). To move the site, change `SITE` and `BASE` in `astro.config.mjs`.

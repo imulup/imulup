@@ -12,7 +12,7 @@ Every step gets imulup's environment, with two changes:
 
 - All `IMULUP_*` variables are removed, including the GitHub token, the app key and the webhook secret. imulup then
   sets its own `IMULUP_STACK`, `IMULUP_PROJECT` and so on (see the
-  [step environment](/imulup/reference/step-environment/)).
+  [step environment](/reference/step-environment/)).
 - With privilege separation, `HOME`, `USER` and `LOGNAME` are set to the step user's.
 
 Everything else passes through unchanged: `PULUMI_ACCESS_TOKEN`, `AWS_*`, `GOOGLE_*`, `ARM_*` and so on.
@@ -20,7 +20,7 @@ Everything else passes through unchanged: `PULUMI_ACCESS_TOKEN`, `AWS_*`, `GOOGL
 :::danger
 Whatever a step can use, a pull request can use too. A PR can change the Pulumi program, or add a `run:` step, to
 print or send off any credential in the environment. Only allowlist repositories whose contributors you'd trust with
-those credentials. See the [security model](/imulup/security/model/).
+those credentials. See the [security model](/security/model/).
 :::
 
 ## Environment variables

@@ -73,7 +73,7 @@ They **can**:
 - use every credential in imulup's environment other than `IMULUP_*` variables, such as `PULUMI_ACCESS_TOKEN` and
   cloud credentials
 
-The [security model](/imulup/security/model/#what-imulup-cant-protect) explains what that means in practice.
+The [security model](/security/model/#what-imulup-cant-protect) explains what that means in practice.
 
 ## Turning it off
 

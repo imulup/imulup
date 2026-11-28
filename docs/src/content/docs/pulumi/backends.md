@@ -15,7 +15,7 @@ PULUMI_ACCESS_TOKEN=pul-...
 Use an [organization or team access token](https://www.pulumi.com/docs/pulumi-cloud/access-management/access-tokens/)
 rather than a personal one, so imulup's access doesn't depend on one person's account.
 
-Pulumi Cloud is also required for [ESC environments](/imulup/pulumi/credentials/#pulumi-esc).
+Pulumi Cloud is also required for [ESC environments](/pulumi/credentials/#pulumi-esc).
 
 ## Self-managed backends
 
@@ -35,7 +35,7 @@ PULUMI_CONFIG_PASSPHRASE=...
 ```
 
 The backend also needs credentials, for example `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` or an instance role for
-S3. See [Cloud credentials](/imulup/pulumi/credentials/).
+S3. See [Cloud credentials](/pulumi/credentials/).
 
 The bucket must already exist. Pulumi doesn't create it, and a missing bucket fails the plan with a `NoSuchBucket`
 error. For S3-compatible storage such as MinIO or Cloudflare R2, add the `endpoint` (and usually `region`) query
@@ -61,5 +61,5 @@ backend:
 
 `file://` backends work, but the state then lives on the imulup host and needs its own backups. In the Docker images,
 steps run as `imulup-runner` and can't write to `/data`. A path such as `file://~` puts the state in the runner's home
-directory, which isn't on a volume unless you add one. That's fine for the [quickstart](/imulup/quickstart/), but use
+directory, which isn't on a volume unless you add one. That's fine for the [quickstart](/quickstart/), but use
 object storage for anything real.

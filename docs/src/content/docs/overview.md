@@ -73,7 +73,7 @@ Some differences go beyond naming:
   use Pulumi's experimental `--save-plan` / `--plan`.
 - **Programs are code.** A Terraform plan evaluates HCL. A Pulumi preview runs your program in Node.js, Python, Go,
   .NET or Java, so anyone who can open a PR can run code on the imulup host. See the
-  [security model](/imulup/security/model/).
+  [security model](/security/model/).
 - **Single instance.** State is one JSON file, so you run one imulup server.
 
 ## Compared with Pulumi Deployments
@@ -89,5 +89,5 @@ code to run and who holds the credentials:
 
 ## What's next
 
-- Try it out in about ten minutes with the [quickstart](/imulup/quickstart/).
-- Read the [security model](/imulup/security/model/) before you point imulup at real cloud credentials.
+- Try it out in about ten minutes with the [quickstart](/quickstart/).
+- Read the [security model](/security/model/) before you point imulup at real cloud credentials.

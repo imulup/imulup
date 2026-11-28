@@ -150,6 +150,6 @@ Merge or close the PR, and imulup releases the `quickstart:dev` lock and deletes
 
 ## Next steps
 
-- [Deploy with Docker](/imulup/install/docker/) for a long-running setup.
-- [Configure projects and stacks](/imulup/usage/projects/) for a real repository.
-- Read the [security model](/imulup/security/model/) before you give imulup real cloud credentials.
+- [Deploy with Docker](/install/docker/) for a long-running setup.
+- [Configure projects and stacks](/usage/projects/) for a real repository.
+- Read the [security model](/security/model/) before you give imulup real cloud credentials.

@@ -4,7 +4,7 @@ description: The imulup container images, and running them with Docker Compose.
 ---
 
 Docker is the recommended way to run imulup. The images include the Pulumi CLI and language runtimes, and they
-come with [privilege separation](/imulup/security/privilege-separation/) already set up.
+come with [privilege separation](/security/privilege-separation/) already set up.
 
 ## Images
 
@@ -39,7 +39,7 @@ Every variant uses the same Pulumi CLI version. Pulumi YAML programs work in any
 
 Steps run as `imulup-runner`, so they can't install packages system-wide. Install dependencies into the project or
 the runner's home directory instead: a virtualenv, `pip install --user`, a local `node_modules`, and so on. See
-[Workflows](/imulup/usage/workflows/).
+[Workflows](/usage/workflows/).
 
 ## Docker Compose
 
@@ -105,11 +105,11 @@ Don't leave unused options set to an empty value, such as `IMULUP_GH_TOKEN=`. An
 so it conflicts with `IMULUP_GH_APP_ID`. Comment out the lines you don't use.
 :::
 
-If you authenticate with a [token](/imulup/github/token/) instead, set `IMULUP_GH_TOKEN` and `IMULUP_GH_USER`, and
+If you authenticate with a [token](/github/token/) instead, set `IMULUP_GH_TOKEN` and `IMULUP_GH_USER`, and
 remove both `secrets:` blocks.
 
 To put imulup behind a reverse proxy on the same host, publish it on loopback only with
-`IMULUP_PUBLISH_PORT=127.0.0.1:4141`. See [Running in production](/imulup/install/production/).
+`IMULUP_PUBLISH_PORT=127.0.0.1:4141`. See [Running in production](/install/production/).
 
 ## `docker run`
 

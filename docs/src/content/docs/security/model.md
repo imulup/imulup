@@ -31,7 +31,7 @@ code. Who can open PRs is the real security boundary:
 | Any GitHub user who can comment | Nothing by default. Commands need write access. |
 | Users with write access | Run `plan`, `apply` and `unlock`, subject to apply requirements. |
 | PR authors with push access | Run arbitrary code as the step user, with the cloud credentials steps get. |
-| The step user (PR code) | Read and change other PRs' checkouts and the shared caches. It can't read imulup's key, tokens, state, environment or memory when [privilege separation](/imulup/security/privilege-separation/) is on. |
+| The step user (PR code) | Read and change other PRs' checkouts and the shared caches. It can't read imulup's key, tokens, state, environment or memory when [privilege separation](/security/privilege-separation/) is on. |
 
 ## Controls
 
@@ -51,7 +51,7 @@ could replay it. TLS keeps deliveries from being captured. Rotate the secret if 
   check. Don't use it on public repositories.
 - Comments from imulup's own account are ignored.
 - `apply` only runs against a successful plan of the PR's current head commit. Any push makes the plan stale.
-- [Apply requirements](/imulup/usage/apply-requirements/) can require an approval from someone other than the author.
+- [Apply requirements](/usage/apply-requirements/) can require an approval from someone other than the author.
   `imulup.yaml` comes from the PR itself, so a PR can remove the requirements set there. Use `--require-approval`
   for a requirement that PRs can't change.
 
@@ -82,7 +82,7 @@ could replay it. TLS keeps deliveries from being captured. Rotate the secret if 
 
 - **Cloud credentials.** Steps need them, so PR code can read them. Scope them tightly: one role per environment,
   least privilege, and short-lived credentials (instance roles, OIDC through Pulumi ESC) instead of long-lived keys.
-  See [Cloud credentials](/imulup/pulumi/credentials/).
+  See [Cloud credentials](/pulumi/credentials/).
 - **Other PRs.** All PRs share one step user. One PR's code can read or tamper with another PR's checkout, or with
   shared caches such as `~/.pulumi/plugins` and package caches. It could, for example, plant a malicious plugin that
   another PR's apply later runs.
@@ -94,13 +94,13 @@ could replay it. TLS keeps deliveries from being captured. Rotate the secret if 
 
 ## Recommendations
 
-1. Run the [Docker images](/imulup/install/docker/), or set up
-   [privilege separation](/imulup/security/privilege-separation/) yourself.
-2. Use a [GitHub App](/imulup/github/app/), installed only on the repositories imulup manages.
+1. Run the [Docker images](/install/docker/), or set up
+   [privilege separation](/security/privilege-separation/) yourself.
+2. Use a [GitHub App](/github/app/), installed only on the repositories imulup manages.
 3. Keep `--repo-allowlist` to repositories whose contributors you'd trust with the cloud credentials.
 4. Leave `--allow-fork-prs` and `--skip-collaborator-check` off.
 5. Give steps short-lived, least-privilege cloud credentials, separate per environment.
-6. Expose only `POST /events`, over TLS. See [Running in production](/imulup/install/production/).
+6. Expose only `POST /events`, over TLS. See [Running in production](/install/production/).
 7. For strong isolation between repositories, run a separate imulup instance per trust boundary, each with its own
    app installation and credentials.
 

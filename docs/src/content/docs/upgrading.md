@@ -23,7 +23,7 @@ Nothing to do: imulup fixes the mode at startup.
 
 ## 0.3.0
 
-- **New:** [automerge](/imulup/usage/automerge/). imulup can merge a PR once every planned project is applied,
+- **New:** [automerge](/usage/automerge/). imulup can merge a PR once every planned project is applied,
   with `--automerge`, `--automerge-method`, or `automerge:` in `imulup.yaml`.
 
 Automerge is off by default. To use it with a GitHub App, change **Contents** to *Read and write*, and accept the new
@@ -33,9 +33,9 @@ permission on each installation.
 
 This release changes how imulup runs. Read it before upgrading from 0.1.
 
-- **New:** [GitHub App](/imulup/github/app/) authentication, with `--gh-app-id` and `--gh-app-key-file`, using
+- **New:** [GitHub App](/github/app/) authentication, with `--gh-app-id` and `--gh-app-key-file`, using
   per-repository, least-privilege installation tokens.
-- **New:** [privilege separation](/imulup/security/privilege-separation/). The Docker images now run the server
+- **New:** [privilege separation](/security/privilege-separation/). The Docker images now run the server
   as `imulup` and PR code as `imulup-runner`.
 - **Changed:** imulup refuses to start if the app key file is readable by group or others.
 - **Changed:** imulup refuses an `imulup.yaml` that is a symlink.
@@ -46,7 +46,7 @@ When upgrading:
 
 1. **Steps no longer run as root in the images.** Workflows that install packages system-wide (`pip install`,
    `npm install -g`, `apt-get`) fail. Use a virtualenv or project-local installs (see
-   [Workflows](/imulup/usage/workflows/#installing-dependencies)), or bake tools into a custom image.
+   [Workflows](/usage/workflows/#installing-dependencies)), or bake tools into a custom image.
 2. **Files that steps need must be readable by `imulup-runner`** (uid 10002), for example a mounted cloud credentials
    file.
 3. **The container must start as root.** If you run it with `--user`, or `runAsUser` in Kubernetes, remove that.

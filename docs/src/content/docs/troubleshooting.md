@@ -38,7 +38,7 @@ Leave `IMULUP_SERVER_USER` and `IMULUP_STEP_USER` unset outside Linux.
 
 **`no such user "imulup-runner"`**
 
-Create the users first. See [Privilege separation](/imulup/security/privilege-separation/#setting-it-up).
+Create the users first. See [Privilege separation](/security/privilege-separation/#setting-it-up).
 
 ## Nothing happens on a pull request
 
@@ -62,7 +62,7 @@ If the delivery was accepted but nothing appears:
 account, use a separate bot account.
 - **`the GitHub App is not installed on <repo>`.** Install the app on that repository.
 - **`creating an installation token for <repo> returned 422`.** The app lacks a permission imulup asks for. Check the
-[permissions](/imulup/github/app/#repository-permissions). After changing them, accept the new permissions on each
+[permissions](/github/app/#repository-permissions). After changing them, accept the new permissions on each
 installation.
 
 ## Plans fail
@@ -71,12 +71,12 @@ installation.
 
 The stack doesn't exist in the backend. Create it with `pulumi stack init`, or add
 `run: pulumi stack select --create "$IMULUP_STACK"` to the plan workflow. See
-[Stack selection](/imulup/pulumi/stacks/#stacks-must-exist).
+[Stack selection](/pulumi/stacks/#stacks-must-exist).
 
 **`NoSuchBucket`**, or other errors from the state backend
 
 Check `PULUMI_BACKEND_URL`. The bucket must exist, the region must match, and S3-compatible storage needs an
-`endpoint`. See [State backends](/imulup/pulumi/backends/).
+`endpoint`. See [State backends](/pulumi/backends/).
 
 **`PULUMI_ACCESS_TOKEN must be set for login during non-interactive CLI sessions`**
 
@@ -89,8 +89,8 @@ The stack uses the passphrase secrets provider. Set one of the two.
 **`Permission denied` from `pip install`, `npm install -g` or `apt-get`**
 
 Steps run as an unprivileged user. Install into the project instead: a virtualenv for Python (see
-[Workflows](/imulup/usage/workflows/#python-virtualenvs)), or a local `node_modules`. Bake system packages into a
-[custom image](/imulup/install/docker/#building-the-images).
+[Workflows](/usage/workflows/#python-virtualenvs)), or a local `node_modules`. Bake system packages into a
+[custom image](/install/docker/#building-the-images).
 
 **`detecting policy pack path: open /data: permission denied`**
 
@@ -104,7 +104,7 @@ because stdin is empty.
 **`invalid imulup.yaml`**
 
 The error names the problem, such as an unknown key or an undefined workflow. See the
-[`imulup.yaml` reference](/imulup/reference/repo-config/#validation).
+[`imulup.yaml` reference](/reference/repo-config/#validation).
 
 ## Applies are skipped
 
@@ -116,7 +116,7 @@ The comment explains each skipped project:
 | `plan is for commit X but the PR is at Y` | Someone pushed after the plan. Plan again. |
 | `the last plan failed` | Fix the failure, and plan again. |
 | `already applied at this commit` | Plan again to apply again. |
-| `… is locked by #N` | Another PR holds the [lock](/imulup/usage/locking/). Merge or close it, or comment `imulup unlock` on it. |
+| `… is locked by #N` | Another PR holds the [lock](/usage/locking/). Merge or close it, or comment `imulup unlock` on it. |
 | `apply requirement 'approved' is not met` | Get an approving review from someone other than the author. |
 | `apply requirement 'mergeable' is not met` | Resolve conflicts with the base branch. Right after a push, wait a few seconds for GitHub to compute mergeability. |
 | `nothing to apply; run imulup plan first` | There's no unapplied, successful plan on the PR. |

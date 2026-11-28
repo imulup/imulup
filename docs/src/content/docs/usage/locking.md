@@ -54,7 +54,7 @@ After an `unlock`, the PR has to plan again before it can apply, and the next pl
 ```
 
 `created_at` is a Unix timestamp. These endpoints have no authentication: see
-[Running in production](/imulup/install/production/#expose-only-the-webhook).
+[Running in production](/install/production/#expose-only-the-webhook).
 
 ## Locks and Pulumi's own locking
 

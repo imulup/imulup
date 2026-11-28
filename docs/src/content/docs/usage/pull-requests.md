@@ -6,7 +6,7 @@ description: What imulup does at each stage of a pull request, and the commit st
 ## 1. Open or push: autoplan
 
 imulup plans automatically when a PR is opened, reopened, pushed to, or marked ready for review. It plans every
-[project and stack](/imulup/usage/projects/) the PR modifies, and posts one comment with a section for each:
+[project and stack](/usage/projects/) the PR modifies, and posts one comment with a section for each:
 
 ```text
 imulup plan — 2/2 projects succeeded
@@ -49,7 +49,7 @@ To plan again without pushing, for example after fixing something outside the re
 imulup plan
 ```
 
-See [Comment commands](/imulup/reference/commands/) for how to plan only some projects.
+See [Comment commands](/reference/commands/) for how to plan only some projects.
 
 ## 3. Apply
 
@@ -69,14 +69,14 @@ imulup skips a project, and says why in the comment, if:
 - it has no plan, or its plan is for an older commit than the PR's head
 - its last plan failed
 - it has already been applied at this commit
-- another PR holds its [lock](/imulup/usage/locking/)
-- its [apply requirements](/imulup/usage/apply-requirements/) aren't met
+- another PR holds its [lock](/usage/locking/)
+- its [apply requirements](/usage/apply-requirements/) aren't met
 
 The other selected projects still run.
 
 ## 4. Merge
 
-Merge the PR as usual, or let [automerge](/imulup/usage/automerge/) do it once everything is applied. When the PR is
+Merge the PR as usual, or let [automerge](/usage/automerge/) do it once everything is applied. When the PR is
 merged or closed, imulup releases its locks, discards its plans, deletes its checkout, and comments with the list of
 released locks.
 
