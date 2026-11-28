@@ -2,21 +2,9 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import catppuccin from '@catppuccin/starlight';
-import baseLinks from './src/plugins/base-links.mjs';
-
-// Where the site is served. To move the docs later:
-//   docs.imulup.com  → SITE = 'https://docs.imulup.com', BASE = '/'
-//   imulup.com/docs  → SITE = 'https://imulup.com',      BASE = '/docs'
-// Page links are written root-relative (`/usage/locking/`); `baseLinks` adds BASE to them.
-const SITE = 'https://imulup.com';
-const BASE = '/';
 
 export default defineConfig({
-	site: SITE,
-	base: BASE,
-	markdown: {
-		rehypePlugins: [baseLinks(BASE)],
-	},
+	site: 'https://docs.imulup.com',
 	integrations: [
 		starlight({
 			title: 'imulup',

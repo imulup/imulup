@@ -9,4 +9,4 @@ npm run dev      # http://localhost:4321/
 npm run build    # static site in dist/
 ```
 
-Pushes to `main` that touch `docs/` deploy to GitHub Pages at <https://imulup.com/> (`.github/workflows/docs.yml`). To move the site, change `SITE` and `BASE` in `astro.config.mjs`.
+Pushes to `main` that touch `docs/` deploy to GitHub Pages at <https://docs.imulup.com/> (`.github/workflows/docs.yml`).
